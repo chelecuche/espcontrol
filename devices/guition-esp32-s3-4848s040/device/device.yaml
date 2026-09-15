@@ -391,8 +391,6 @@ spi:
 # ---------------------------------------------------------------------------
 i2c:
   sda: GPIO19
-  # Shorten GT911 reads so touch polling spends less time on the bus.
-  frequency: 400kHz
   scl:
     number: 45
     ignore_strapping_warning: true
