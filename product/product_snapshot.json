@@ -11,7 +11,7 @@
   "summary": {
     "deviceProfiles": 8,
     "cardTypes": 43,
-    "entityNames": 105,
+    "entityNames": 106,
     "icons": 344,
     "structuralIcons": 22,
     "compatibilityFixtureGroups": 2
@@ -6778,6 +6778,19 @@
           "screen_saver__photo_metadata_entity",
           "screen_saver_photo_metadata_entity",
           "screensaver_metadata_entity"
+        ],
+        "groups": [
+          "settings"
+        ]
+      },
+      {
+        "key": "screen_saver_metadata_overlay",
+        "domain": "switch",
+        "name": "Screen Saver: Metadata Overlay",
+        "objectIds": [
+          "screen_saver__metadata_overlay",
+          "screen_saver_metadata_overlay",
+          "metadata_overlay_enabled"
         ],
         "groups": [
           "settings"
