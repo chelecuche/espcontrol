@@ -27,6 +27,35 @@ jobs:
           rm -rf "${GITHUB_WORKSPACE:?}/"* "${GITHUB_WORKSPACE:?}/".[!.]* "${GITHUB_WORKSPACE:?}/"..?* 2>/dev/null ||
             sudo rm -rf "${GITHUB_WORKSPACE:?}/"* "${GITHUB_WORKSPACE:?}/".[!.]* "${GITHUB_WORKSPACE:?}/"..?*
 
+      - name: Reclaim Docker storage before checkout
+        run: |
+          if docker info >/dev/null 2>&1; then
+            docker_cmd=(docker)
+          elif sudo -n docker info >/dev/null 2>&1; then
+            docker_cmd=(sudo -n docker)
+          else
+            docker_cmd=()
+          fi
+
+          if [ "${#docker_cmd[@]}" -gt 0 ]; then
+            "${docker_cmd[@]}" container prune -f || true
+            "${docker_cmd[@]}" image prune -af || true
+            "${docker_cmd[@]}" builder prune -f --keep-storage 2GB || true
+            "${docker_cmd[@]}" volume prune -f || true
+          else
+            echo "Docker is not available to the self-hosted runner user."
+          fi
+
+          for update_dir in "$HOME"/actions-runner*/_work/_update; do
+            [ -d "${update_dir}" ] || continue
+            rm -rf "${update_dir}" || sudo rm -rf "${update_dir}" || true
+          done
+
+          legacy_cache="${HOME}/.cache/espcontrol-actions/esphome"
+          if [ -d "${legacy_cache}" ]; then
+            rm -rf "${legacy_cache}" || sudo rm -rf "${legacy_cache}" || true
+          fi
+
       - uses: actions/checkout@v7.0.1
         with:
           sparse-checkout: |
