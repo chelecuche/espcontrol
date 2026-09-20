@@ -6,6 +6,7 @@
 #include <utility>
 #include <vector>
 
+#include "esphome/components/api/homeassistant_service.h"
 #include "ha_read_coordinator.h"
 #include "home_assistant_binding_service.h"
 #include "external_memory_allocator.h"

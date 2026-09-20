@@ -208,7 +208,7 @@ class HaEntityCatalogHandler final
       std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
       for (auto &candidate : ha_entity_catalog_pending()) {
         if (candidate.state == HaEntityCatalogPending::State::PENDING &&
-            millis() - candidate.created_ms > HA_ENTITY_CATALOG_TIMEOUT_MS) {
+            esphome::millis() - candidate.created_ms > HA_ENTITY_CATALOG_TIMEOUT_MS) {
           stale_call_id = candidate.call_id;
           candidate.state = HaEntityCatalogPending::State::ERROR;
           candidate.error = "Home Assistant entity catalog request timed out";
@@ -226,7 +226,7 @@ class HaEntityCatalogHandler final
       }
       slot->state = HaEntityCatalogPending::State::PENDING;
       slot->request_id = ha_entity_catalog_next_request_id();
-      slot->created_ms = millis();
+      slot->created_ms = esphome::millis();
       slot->body.clear();
       slot->error.clear();
     }
