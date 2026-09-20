@@ -126,6 +126,14 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             state.entityNames[parsed.id] = [];
         uniquePush(state.entityNames[parsed.id], String(name));
     }
+    function rememberEntityRecord(this: any, record?: any) {
+        if (!record || !record.entity_id)
+            return;
+        rememberEntityName(record.entity_id, record.name || titleFromEntityId(record.entity_id));
+        if (!state.entityCatalogRecords)
+            state.entityCatalogRecords = {};
+        state.entityCatalogRecords[record.entity_id] = record;
+    }
     function rememberConfiguredButtonEntities(this: any, button?: any) {
         if (!button)
             return;
@@ -186,8 +194,17 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                 return a.localeCompare(b);
             return al.localeCompare(bl);
         });
+        var records: any = state.entityCatalogRecords || {};
+        Object.keys(records).forEach(function (this: any, id?: any) {
+            var parsed: any = parseHomeAssistantEntity(id);
+            if (!parsed || (domains && domains.length && !allowed[parsed.domain]) || ids.indexOf(id) !== -1)
+                return;
+            ids.push(id);
+        });
         return ids.map(function (this: any, id?: any) {
-            return { value: id, label: optionLabelForEntity(id) };
+            var record: any = records[id];
+            var context: any = record && [record.area_name, record.device_name].filter(Boolean).join(" • ");
+            return { value: id, label: optionLabelForEntity(id), context: context };
         });
     }
     function ensureEntityDropdown(this: any, input?: any) {
@@ -224,12 +241,12 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                 return true;
             return item.value.toLowerCase().indexOf(query) !== -1 ||
                 item.label.toLowerCase().indexOf(query) !== -1;
-        }).slice(0, 12);
+        });
         items.forEach(function (this: any, item?: any) {
             var option: any = document.createElement("button");
             option.type = "button";
             option.className = "sp-entity-option";
-            option.textContent = item.value;
+            option.textContent = item.context ? item.label + " • " + item.context + " (" + item.value + ")" : item.label + " (" + item.value + ")";
             option.addEventListener("mousedown", function (this: any, e?: any) {
                 e.preventDefault();
                 input._entitySuppressDropdown = true;
@@ -242,18 +259,27 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             });
             dropdown.appendChild(option);
         });
-        dropdown.classList.toggle("sp-open", document.activeElement === input && items.length > 0);
+        if (input._remoteEntityError) {
+            var error: any = document.createElement("div");
+            error.className = "sp-entity-catalog-error";
+            error.textContent = String(input._remoteEntityError);
+            dropdown.appendChild(error);
+        }
+        dropdown.classList.toggle("sp-open", document.activeElement === input && (items.length > 0 || !!input._remoteEntityError));
         var remoteQuery: any = String(input.value || "").trim();
         if (entityCatalog && !input._remoteEntityRequest && input._remoteEntityQuery !== remoteQuery) {
             input._remoteEntityQuery = remoteQuery;
             input._remoteEntityRequest = entityCatalog.search(String(input.value || ""), input._entityDomains || []).then(function (this: any, records?: any[]) {
                 input._remoteEntityRequest = null;
+                input._remoteEntityError = null;
                 (records || []).forEach(function (this: any, record?: any) {
-                    rememberEntityName(record.entity_id, record.name);
+                    rememberEntityRecord(record);
                 });
                 refreshEntityDatalist(input);
             }).catch(function (this: any) {
                 input._remoteEntityRequest = null;
+                input._remoteEntityError = "Home Assistant entity search is unavailable. Check the ESPHome connection and retry.";
+                refreshEntityDatalist(input);
             });
         }
     }
@@ -264,6 +290,7 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
         input._entitySuggestionsAttached = true;
         input.addEventListener("focus", function (this: any) { refreshEntityDatalist(input); });
         input.addEventListener("input", function (this: any) {
+            input._remoteEntityError = null;
             rememberEntityName(input.value, optionLabelForEntity(input.value));
             refreshEntityDatalist(input);
         });

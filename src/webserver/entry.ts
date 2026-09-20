@@ -330,11 +330,7 @@ function composeApplicationContext(): ApplicationContext {
   let confirmationOptions: ReturnType<typeof createConfigConfirmationOptionsFeature>;
   let clockBarState: ClockBarFeature;
   let statusPreview: AppStatusPreviewFeature;
-  let entityCatalogStorage: Storage | undefined;
-  try { entityCatalogStorage = dom.window.localStorage; } catch (_) { entityCatalogStorage = undefined; }
-  const entityCatalog = createEntityCatalogClient(entityCatalogStorage, dom.fetch);
-  const pairingHash = dom.window.location.hash.match(/^#espcontrol-pairing=([^&]+)$/);
-  if (pairingHash && pairingHash[1]) entityCatalog.importPairing(pairingHash[1]);
+  const entityCatalog = createEntityCatalogClient(undefined, dom.fetch);
   const entityState = createEntityStateFeature({
     actionCardStateEntity: (button) => confirmationOptions.actionCardStateEntity(button),
     totalSlots: () => layout.totalSlots,

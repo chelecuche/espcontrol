@@ -1,26 +1,15 @@
 import type { HomeAssistantEntityPage, HomeAssistantEntityRecord } from "../model/entity_catalog";
 
-export interface EntityCatalogPairing {
-    baseUrl: string;
-    deviceId: string;
-    token: string;
-}
-
 export interface EntityCatalogClient {
-    pairing(): EntityCatalogPairing | null;
-    savePairing(value: EntityCatalogPairing): void;
-    importPairing(value: string): boolean;
+    /** Search the HA catalog through the display's native ESPHome connection. */
     search(query: string, domains?: string[]): Promise<HomeAssistantEntityRecord[]>;
 }
 
-const STORAGE_KEY = "espcontrol.home-assistant-pairing";
-
 function fieldForDomains(domains: string[]): string {
-    const normalized = domains.slice().sort().join(",");
     const fields: Record<string, string> = {
         alarm_control_panel: "alarm",
         automation: "automation",
-        binary_sensor: "sensor",
+        binary_sensor: "binary_sensor",
         button: "button",
         camera: "camera",
         climate: "climate",
@@ -41,80 +30,71 @@ function fieldForDomains(domains: string[]): string {
         select: "select",
         script: "script",
         sensor: "sensor",
-        switch: "switch",
         text_sensor: "sensor",
+        switch: "switch",
         vacuum: "vacuum",
         weather: "weather",
         device_tracker: "device_tracker",
     };
     const first = domains[0];
     if (domains.length === 1 && first && fields[first]) return fields[first];
-    if (normalized === "") return "entity";
     return "entity";
 }
 
+const SEARCH_PATH = "/api/v1/ha/entities/search";
+const POLL_DELAY_MS = 100;
+const MAX_POLLS = 150;
+
+function wait(milliseconds: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
 export function createEntityCatalogClient(
-    storage: Storage | undefined = typeof localStorage === "undefined" ? undefined : localStorage,
+    _storage?: Storage,
     fetchImpl: typeof fetch = fetch,
 ): EntityCatalogClient {
-    let cached: EntityCatalogPairing | null = null;
-    function pairing(): EntityCatalogPairing | null {
-        if (cached) return cached;
-        if (!storage) return null;
-        try {
-            const parsed = JSON.parse(storage.getItem(STORAGE_KEY) || "null");
-            if (!parsed || typeof parsed.baseUrl !== "string" || typeof parsed.deviceId !== "string" || typeof parsed.token !== "string") return null;
-            cached = parsed as EntityCatalogPairing;
-            return cached;
-        } catch (_) {
-            return null;
-        }
-    }
-    function savePairing(value: EntityCatalogPairing): void {
-        cached = { baseUrl: value.baseUrl.replace(/\/$/, ""), deviceId: value.deviceId, token: value.token };
-        try { storage?.setItem(STORAGE_KEY, JSON.stringify(cached)); } catch (_) { /* memory cache still works */ }
-    }
-    function importPairing(value: string): boolean {
-        try {
-            const normalized = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
-            const json = atob(normalized);
-            const parsed = JSON.parse(json) as EntityCatalogPairing;
-            if (!parsed || typeof parsed.baseUrl !== "string" || typeof parsed.deviceId !== "string" || typeof parsed.token !== "string") return false;
-            savePairing(parsed);
-            return true;
-        } catch (_) {
-            return false;
-        }
-    }
     async function search(query: string, domains: string[] = []): Promise<HomeAssistantEntityRecord[]> {
-        const active = pairing();
-        if (!active) return [];
         const entities: HomeAssistantEntityRecord[] = [];
         let cursor = 0;
-        for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
+        for (let pageNumber = 0; pageNumber < 200; pageNumber += 1) {
             const params = new URLSearchParams({
-                q: query,
+                query,
                 field: fieldForDomains(domains),
-                limit: "100",
+                limit: "50",
                 cursor: String(cursor),
             });
-            const response = await fetchImpl(`${active.baseUrl}/api/espcontrol/${encodeURIComponent(active.deviceId)}/entities?${params}`, {
-                headers: { Authorization: `Bearer ${active.token}` },
-                credentials: "omit",
+            const start = await fetchImpl(`${SEARCH_PATH}?${params}`, {
+                credentials: "same-origin",
                 cache: "no-store",
             });
-            if (response.status === 401) {
-                cached = null;
-                try { storage?.removeItem(STORAGE_KEY); } catch (_) { /* storage is optional */ }
-                return [];
+            if (!start.ok && start.status !== 202) {
+                throw new Error(`Entity catalog request failed (${start.status})`);
             }
-            if (!response.ok) return [];
-            const page = await response.json() as HomeAssistantEntityPage;
-            if (Array.isArray(page.entities)) entities.push(...page.entities);
+            const pending = await start.json() as { request_id?: number };
+            if (typeof pending.request_id !== "number") {
+                throw new Error("Entity catalog did not return a request ID");
+            }
+            let page: HomeAssistantEntityPage | null = null;
+            for (let poll = 0; poll < MAX_POLLS; poll += 1) {
+                await wait(POLL_DELAY_MS);
+                const response = await fetchImpl(`${SEARCH_PATH}?request_id=${pending.request_id}`, {
+                    credentials: "same-origin",
+                    cache: "no-store",
+                });
+                if (response.status === 202) continue;
+                if (!response.ok) {
+                    const error = await response.json().catch(() => ({})) as { error?: string };
+                    throw new Error(error.error || `Entity catalog request failed (${response.status})`);
+                }
+                page = await response.json() as HomeAssistantEntityPage;
+                break;
+            }
+            if (!page || !Array.isArray(page.entities)) throw new Error("Home Assistant entity catalog timed out");
+            entities.push(...page.entities);
             if (page.next_cursor === null || typeof page.next_cursor !== "number" || page.next_cursor <= cursor) break;
             cursor = page.next_cursor;
         }
         return entities;
     }
-    return { pairing, savePairing, importPairing, search };
+    return { search };
 }

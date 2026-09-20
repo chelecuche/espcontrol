@@ -17,8 +17,7 @@ export interface HomeAssistantEntityRecord {
 }
 
 export interface HomeAssistantEntityPage {
-    protocol: number;
-    device_id: string;
+    protocol_version: number;
     entities: HomeAssistantEntityRecord[];
     next_cursor: number | null;
 }

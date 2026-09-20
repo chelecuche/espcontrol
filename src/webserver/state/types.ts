@@ -256,4 +256,5 @@ export interface AppState {
   settingsDraft: SettingsDraft | null;
   entityPostPaths: Record<string, string>;
   entityNames: Record<string, string[]>;
+  entityCatalogRecords: Record<string, Record<string, any>>;
 }
