@@ -181,7 +181,10 @@ class HaEntityCatalogHandler final
       return;
     }
     if (slot->state == HaEntityCatalogPending::State::PENDING) {
-      request->send(202, "application/json",
+      // The ESP-IDF web-server adapter reports non-200 async responses as
+      // errors to browser fetch clients. Keep the body stateful and use 200
+      // so the client can reliably continue polling.
+      request->send(200, "application/json",
                     ha_entity_catalog_json_status("pending", request_id).c_str());
       return;
     }
@@ -244,7 +247,9 @@ class HaEntityCatalogHandler final
       slot->error = "Home Assistant is not ready for entity catalog requests";
     }
     const std::string body = ha_entity_catalog_json_status("pending", slot->request_id);
-    request->send(202, "application/json", body.c_str());
+    // See the polling response above: pending is represented in the JSON
+    // payload because the web-server adapter does not preserve 202 here.
+    request->send(200, "application/json", body.c_str());
   }
 };
 

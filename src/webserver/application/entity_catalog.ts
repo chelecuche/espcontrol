@@ -45,6 +45,11 @@ const SEARCH_PATH = "/api/v1/ha/entities/search";
 const POLL_DELAY_MS = 100;
 const MAX_POLLS = 150;
 
+interface PendingCatalogResponse {
+    status?: string;
+    request_id?: number;
+}
+
 function wait(milliseconds: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -68,10 +73,13 @@ export function createEntityCatalogClient(
                 credentials: "same-origin",
                 cache: "no-store",
             });
-            if (!start.ok && start.status !== 202) {
+            const pending = await start.json().catch(() => ({})) as PendingCatalogResponse;
+            // Older firmware used 202 for this response, while the ESP-IDF
+            // web-server adapter can surface that as 500. The JSON state is
+            // authoritative, so accept a pending response from either form.
+            if (!start.ok && start.status !== 202 && pending.status !== "pending") {
                 throw new Error(`Entity catalog request failed (${start.status})`);
             }
-            const pending = await start.json() as { request_id?: number };
             if (typeof pending.request_id !== "number") {
                 throw new Error("Entity catalog did not return a request ID");
             }
@@ -82,12 +90,13 @@ export function createEntityCatalogClient(
                     credentials: "same-origin",
                     cache: "no-store",
                 });
-                if (response.status === 202) continue;
+                const payload = await response.json().catch(() => ({})) as PendingCatalogResponse &
+                    Partial<HomeAssistantEntityPage> & { error?: string };
+                if (response.status === 202 || payload.status === "pending") continue;
                 if (!response.ok) {
-                    const error = await response.json().catch(() => ({})) as { error?: string };
-                    throw new Error(error.error || `Entity catalog request failed (${response.status})`);
+                    throw new Error(payload.error || `Entity catalog request failed (${response.status})`);
                 }
-                page = await response.json() as HomeAssistantEntityPage;
+                page = payload as HomeAssistantEntityPage;
                 break;
             }
             if (!page || !Array.isArray(page.entities)) throw new Error("Home Assistant entity catalog timed out");
