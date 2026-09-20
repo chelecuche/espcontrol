@@ -128,7 +128,8 @@ inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
   }
   esphome::api::HomeassistantActionRequest request;
   const uint32_t call_id = ha_entity_catalog_next_call_id();
-  if (!ha_action_begin(request, "espcontrol.search_entities", false, 8, call_id)) {
+  const size_t data_count = 8 + (capabilities.empty() ? 0 : 1);
+  if (!ha_action_begin(request, "espcontrol.search_entities", false, data_count, call_id)) {
     return false;
   }
   request.wants_response = true;
@@ -138,7 +139,9 @@ inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
   ha_action_add_data(request, "device_id", device_id.c_str());
   ha_action_add_data(request, "include_hidden", include_hidden ? "true" : "false");
   ha_action_add_data(request, "include_disabled", include_disabled ? "true" : "false");
-  ha_action_add_data(request, "capabilities", capabilities.c_str());
+  if (!capabilities.empty()) {
+    ha_action_add_data(request, "capabilities", capabilities.c_str());
+  }
   ha_action_add_data(request, "limit", limit.c_str());
   ha_action_add_data(request, "cursor", cursor.c_str());
   slot.call_id = call_id;
@@ -154,6 +157,45 @@ inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
     return false;
   }
   return true;
+}
+
+inline void ha_entity_catalog_schedule_send(
+    uint32_t request_id,
+    std::string query,
+    std::string field,
+    std::string area,
+    std::string device_id,
+    std::string capabilities,
+    bool include_hidden,
+    bool include_disabled,
+    std::string limit,
+    std::string cursor) {
+  // ESPHome's API connection is owned by the main loop. The HTTP server runs
+  // on another task, so dispatch the native action through the scheduler
+  // instead of touching APIConnection directly from the request handler.
+  esphome::App.scheduler.set_timeout(
+      nullptr, request_id, 0,
+      [request_id, query = std::move(query), field = std::move(field),
+       area = std::move(area), device_id = std::move(device_id),
+       capabilities = std::move(capabilities), include_hidden, include_disabled,
+       limit = std::move(limit), cursor = std::move(cursor)]() mutable {
+        HaEntityCatalogPending *slot = nullptr;
+        {
+          std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
+          slot = ha_entity_catalog_find(request_id);
+          if (slot == nullptr || slot->state != HaEntityCatalogPending::State::PENDING) return;
+        }
+        if (ha_entity_catalog_send(
+                *slot, query, field, area, device_id, capabilities, include_hidden,
+                include_disabled, limit, cursor)) {
+          return;
+        }
+        std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
+        if (slot->state == HaEntityCatalogPending::State::PENDING) {
+          slot->state = HaEntityCatalogPending::State::ERROR;
+          slot->error = "Home Assistant is not ready for entity catalog requests";
+        }
+      });
 }
 
 class HaEntityCatalogHandler final
@@ -298,13 +340,9 @@ class HaEntityCatalogHandler final
     if (stale_call_id != 0) {
       ha_cancel_action_response_callback(stale_call_id, "entity catalog request timed out");
     }
-    if (!ha_entity_catalog_send(
-            *slot, query, field, area, device_id, capabilities, include_hidden,
-            include_disabled, limit, cursor)) {
-      std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
-      slot->state = HaEntityCatalogPending::State::ERROR;
-      slot->error = "Home Assistant is not ready for entity catalog requests";
-    }
+    ha_entity_catalog_schedule_send(
+        slot->request_id, query, field, area, device_id, capabilities, include_hidden,
+        include_disabled, limit, cursor);
     const std::string body = ha_entity_catalog_json_status("pending", slot->request_id);
     // See the polling response above: pending is represented in the JSON
     // payload because the web-server adapter does not preserve 202 here.
