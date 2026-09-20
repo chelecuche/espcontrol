@@ -199,7 +199,17 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             var parsed: any = parseHomeAssistantEntity(id);
             if (!parsed || (domains && domains.length && !allowed[parsed.domain]) || ids.indexOf(id) !== -1)
                 return;
+            var record: any = records[id];
+            // Hidden and disabled entities are available through an explicit
+            // manual ID, but should not crowd the normal picker results.
+            if (record && (record.hidden || record.disabled))
+                return;
             ids.push(id);
+        });
+        ids.sort(function (this: any, a?: any, b?: any) {
+            var al: any = optionLabelForEntity(a).toLowerCase();
+            var bl: any = optionLabelForEntity(b).toLowerCase();
+            return al === bl ? a.localeCompare(b) : al.localeCompare(bl);
         });
         return ids.map(function (this: any, id?: any) {
             var record: any = records[id];
@@ -259,28 +269,78 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             });
             dropdown.appendChild(option);
         });
-        if (input._remoteEntityError) {
+        if (input._remoteEntityLoading) {
+            var loading: any = document.createElement("div");
+            loading.className = "sp-entity-catalog-status";
+            loading.textContent = "Searching Home Assistant…";
+            dropdown.appendChild(loading);
+        } else if (input._remoteEntityError) {
             var error: any = document.createElement("div");
             error.className = "sp-entity-catalog-error";
             error.textContent = String(input._remoteEntityError);
             dropdown.appendChild(error);
-        }
-        dropdown.classList.toggle("sp-open", document.activeElement === input && (items.length > 0 || !!input._remoteEntityError));
-        var remoteQuery: any = String(input.value || "").trim();
-        if (entityCatalog && !input._remoteEntityRequest && input._remoteEntityQuery !== remoteQuery) {
-            input._remoteEntityQuery = remoteQuery;
-            input._remoteEntityRequest = entityCatalog.search(String(input.value || ""), input._entityDomains || []).then(function (this: any, records?: any[]) {
-                input._remoteEntityRequest = null;
-                input._remoteEntityError = null;
-                (records || []).forEach(function (this: any, record?: any) {
-                    rememberEntityRecord(record);
-                });
-                refreshEntityDatalist(input);
-            }).catch(function (this: any) {
-                input._remoteEntityRequest = null;
-                input._remoteEntityError = "Home Assistant entity search is unavailable. Check the ESPHome connection and retry.";
+            var retry: any = document.createElement("button");
+            retry.type = "button";
+            retry.className = "sp-entity-catalog-retry";
+            retry.textContent = "Retry search";
+            retry.addEventListener("mousedown", function (this: any, e?: any) {
+                e.preventDefault();
+                input._remoteEntityQuery = null;
                 refreshEntityDatalist(input);
             });
+            dropdown.appendChild(retry);
+        } else if (!items.length) {
+            var empty: any = document.createElement("div");
+            empty.className = "sp-entity-catalog-status";
+            empty.textContent = "No matching Home Assistant entities.";
+            dropdown.appendChild(empty);
+        }
+        dropdown.classList.toggle("sp-open", document.activeElement === input &&
+            (items.length > 0 || input._remoteEntityLoading || !!input._remoteEntityError));
+        var remoteQuery: any = String(input.value || "").trim();
+        if (entityCatalog && input._remoteEntityQuery !== remoteQuery) {
+            input._remoteEntityQuery = remoteQuery;
+            input._remoteEntityLoading = true;
+            input._remoteEntityError = null;
+            input._remoteEntityGeneration = (input._remoteEntityGeneration || 0) + 1;
+            var generation: any = input._remoteEntityGeneration;
+            var domains: any[] = (input._entityDomains || []).slice();
+            var cacheKey: any = JSON.stringify([remoteQuery, domains]);
+            var cached: any = input._entityCatalogCache && input._entityCatalogCache[cacheKey];
+            if (cached) {
+                cached.forEach(function (this: any, record?: any) { rememberEntityRecord(record); });
+                input._remoteEntityLoading = false;
+                refreshEntityDatalist(input);
+            } else {
+                if (input._remoteEntityTimer)
+                    clearTimeout(input._remoteEntityTimer);
+                input._remoteEntityTimer = setTimeout(function (this: any) {
+                    input._remoteEntityTimer = null;
+                    input._remoteEntityRequest = entityCatalog.search(remoteQuery, domains).then(function (this: any, records?: any[]) {
+                        if (generation !== input._remoteEntityGeneration)
+                            return;
+                        input._remoteEntityRequest = null;
+                        input._remoteEntityLoading = false;
+                        input._remoteEntityError = null;
+                        var result: any[] = records || [];
+                        if (!input._entityCatalogCache)
+                            input._entityCatalogCache = {};
+                        input._entityCatalogCache[cacheKey] = result;
+                        result.forEach(function (this: any, record?: any) {
+                            rememberEntityRecord(record);
+                        });
+                        refreshEntityDatalist(input);
+                    }).catch(function (this: any, error?: any) {
+                        if (generation !== input._remoteEntityGeneration)
+                            return;
+                        input._remoteEntityRequest = null;
+                        input._remoteEntityLoading = false;
+                        input._remoteEntityError = "Home Assistant entity search is unavailable. Check the ESPHome connection and retry.";
+                        refreshEntityDatalist(input);
+                    });
+                    refreshEntityDatalist(input);
+                }, 180);
+            }
         }
     }
     function attachEntitySuggestions(this: any, input?: any, domains?: any) {
@@ -288,6 +348,9 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             return input;
         input._entityDomains = domains || [];
         input._entitySuggestionsAttached = true;
+        input._entityCatalogCache = {};
+        input._remoteEntityGeneration = 0;
+        input._remoteEntityLoading = false;
         input.addEventListener("focus", function (this: any) { refreshEntityDatalist(input); });
         input.addEventListener("input", function (this: any) {
             input._remoteEntityError = null;

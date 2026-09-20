@@ -6,7 +6,7 @@ description:
 
 # Enable Actions
 
-EspControl needs permission to call Home Assistant actions (like toggling lights, running scripts, changing media volume, or adjusting climate targets) on your behalf. Without this, the touchscreen can display read-only information but **cards won't be able to control your devices or request forecast data**.
+EspControl needs permission to call Home Assistant actions (like toggling lights, running scripts, changing media volume, or adjusting climate targets) on your behalf. The same native connection is used to load the entity picker, so this setting is required before matching Home Assistant entities can appear. Without it, the touchscreen can display read-only information but **cards won't be able to control your devices, request forecast data, or load the entity catalog**.
 
 Your display will prompt you to do this during first-time setup. Follow the steps below.
 
@@ -32,6 +32,13 @@ Your display will prompt you to do this during first-time setup. Follow the step
 
 ::: tip One-time setup
 You only need to do this once per device. The setting persists across firmware updates and device restarts.
+:::
+
+::: warning Entity picker still empty
+Open the device's web page directly and retry the search after enabling actions. A
+fresh browser does not need a Home Assistant token or pairing link. If the
+connection is unavailable, the picker keeps manual entity-ID entry available and
+shows a retry message instead of treating an empty result as success.
 :::
 
 ## What If I Skip This?

@@ -2,7 +2,19 @@ import type { HomeAssistantEntityPage, HomeAssistantEntityRecord } from "../mode
 
 export interface EntityCatalogClient {
     /** Search the HA catalog through the display's native ESPHome connection. */
-    search(query: string, domains?: string[]): Promise<HomeAssistantEntityRecord[]>;
+    search(
+        query: string,
+        domains?: string[],
+        options?: EntityCatalogSearchOptions,
+    ): Promise<HomeAssistantEntityRecord[]>;
+}
+
+export interface EntityCatalogSearchOptions {
+    area?: string;
+    deviceId?: string;
+    includeHidden?: boolean;
+    includeDisabled?: boolean;
+    capabilities?: string[];
 }
 
 function fieldForDomains(domains: string[]): string {
@@ -36,6 +48,18 @@ function fieldForDomains(domains: string[]): string {
         weather: "weather",
         device_tracker: "device_tracker",
     };
+    const normalized = new Set(domains);
+    const sensorDomains = new Set(["sensor", "binary_sensor", "text_sensor", "input_number"]);
+    if (normalized.size > 1 && [...normalized].every((domain) => sensorDomains.has(domain))) {
+        return "sensor";
+    }
+    const actionDomains = new Set([
+        "scene", "script", "automation", "button", "input_button", "input_boolean",
+        "number", "input_number", "select", "input_select",
+    ]);
+    if (normalized.size > 1 && [...normalized].every((domain) => actionDomains.has(domain))) {
+        return "action";
+    }
     const first = domains[0];
     if (domains.length === 1 && first && fields[first]) return fields[first];
     return "entity";
@@ -48,6 +72,7 @@ const MAX_POLLS = 150;
 interface PendingCatalogResponse {
     status?: string;
     request_id?: number;
+    error?: string;
 }
 
 function wait(milliseconds: number): Promise<void> {
@@ -58,7 +83,11 @@ export function createEntityCatalogClient(
     _storage?: Storage,
     fetchImpl: typeof fetch = fetch,
 ): EntityCatalogClient {
-    async function search(query: string, domains: string[] = []): Promise<HomeAssistantEntityRecord[]> {
+    async function search(
+        query: string,
+        domains: string[] = [],
+        options: EntityCatalogSearchOptions = {},
+    ): Promise<HomeAssistantEntityRecord[]> {
         const entities: HomeAssistantEntityRecord[] = [];
         let cursor = 0;
         let complete = false;
@@ -69,6 +98,11 @@ export function createEntityCatalogClient(
                 limit: "50",
                 cursor: String(cursor),
             });
+            if (options.area) params.set("area", options.area);
+            if (options.deviceId) params.set("device_id", options.deviceId);
+            if (options.includeHidden) params.set("include_hidden", "1");
+            if (options.includeDisabled) params.set("include_disabled", "1");
+            if (options.capabilities?.length) params.set("capabilities", options.capabilities.join(","));
             const start = await fetchImpl(`${SEARCH_PATH}?${params}`, {
                 credentials: "same-origin",
                 cache: "no-store",
@@ -78,10 +112,10 @@ export function createEntityCatalogClient(
             // web-server adapter can surface that as 500. The JSON state is
             // authoritative, so accept a pending response from either form.
             if (!start.ok && start.status !== 202 && pending.status !== "pending") {
-                throw new Error(`Entity catalog request failed (${start.status})`);
+                throw new Error(pending.error || `Entity catalog request failed (${start.status})`);
             }
             if (typeof pending.request_id !== "number") {
-                throw new Error("Entity catalog did not return a request ID");
+                throw new Error(pending.error || "Entity catalog did not return a request ID");
             }
             let page: HomeAssistantEntityPage | null = null;
             for (let poll = 0; poll < MAX_POLLS; poll += 1) {

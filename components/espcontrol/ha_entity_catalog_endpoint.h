@@ -22,6 +22,10 @@ namespace espcontrol {
 constexpr size_t HA_ENTITY_CATALOG_MAX_PENDING = 2;
 constexpr uint32_t HA_ENTITY_CATALOG_TIMEOUT_MS = 15000;
 constexpr size_t HA_ENTITY_CATALOG_MAX_QUERY = 120;
+constexpr size_t HA_ENTITY_CATALOG_MAX_FILTER = 120;
+constexpr size_t HA_ENTITY_CATALOG_MAX_BODY = 24000;
+constexpr uint32_t HA_ENTITY_CATALOG_MAX_LIMIT = 50;
+constexpr uint32_t HA_ENTITY_CATALOG_MAX_CURSOR = 10000;
 
 struct HaEntityCatalogPending {
   enum class State : uint8_t { FREE, PENDING, COMPLETE, ERROR };
@@ -100,6 +104,12 @@ inline void ha_entity_catalog_complete(uint32_t request_id,
     slot->error = "Home Assistant returned an empty catalog response";
     return;
   }
+  if (slot->body.size() > HA_ENTITY_CATALOG_MAX_BODY) {
+    slot->body.clear();
+    slot->state = HaEntityCatalogPending::State::ERROR;
+    slot->error = "Home Assistant entity catalog response is too large";
+    return;
+  }
   slot->state = HaEntityCatalogPending::State::COMPLETE;
 }
 
@@ -108,6 +118,9 @@ inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
                                    const std::string &field,
                                    const std::string &area,
                                    const std::string &device_id,
+                                   const std::string &capabilities,
+                                   bool include_hidden,
+                                   bool include_disabled,
                                    const std::string &limit,
                                    const std::string &cursor) {
   if (!ha_api_state_connected() || !ha_internal_heap_available("entity catalog")) {
@@ -123,8 +136,9 @@ inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
   ha_action_add_data(request, "field", field.c_str());
   ha_action_add_data(request, "area", area.c_str());
   ha_action_add_data(request, "device_id", device_id.c_str());
-  ha_action_add_data(request, "include_hidden", "false");
-  ha_action_add_data(request, "include_disabled", "false");
+  ha_action_add_data(request, "include_hidden", include_hidden ? "true" : "false");
+  ha_action_add_data(request, "include_disabled", include_disabled ? "true" : "false");
+  ha_action_add_data(request, "capabilities", capabilities.c_str());
   ha_action_add_data(request, "limit", limit.c_str());
   ha_action_add_data(request, "cursor", cursor.c_str());
   slot.call_id = call_id;
@@ -162,6 +176,10 @@ class HaEntityCatalogHandler final
       return;
     }
 #endif
+    if (!origin_allowed(request)) {
+      request->send(403, "application/json", "{\"error\":\"cross_origin_forbidden\"}");
+      return;
+    }
     const std::string request_id_text = request->arg("request_id");
     if (!request_id_text.empty()) {
       send_existing(request, static_cast<uint32_t>(std::strtoul(request_id_text.c_str(), nullptr, 10)));
@@ -171,38 +189,82 @@ class HaEntityCatalogHandler final
   }
 
  private:
+  static bool origin_allowed(esphome::web_server_idf::AsyncWebServerRequest *request) {
+    const auto origin = request->get_header("Origin");
+    if (!origin.has_value() || origin->empty()) return true;
+    const auto host = request->get_header("Host");
+    if (!host.has_value() || host->empty()) return false;
+    return *origin == "http://" + *host || *origin == "https://" + *host;
+  }
+
   static void send_existing(
       esphome::web_server_idf::AsyncWebServerRequest *request,
       uint32_t request_id) {
-    std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
-    HaEntityCatalogPending *slot = ha_entity_catalog_find(request_id);
-    if (slot == nullptr) {
-      request->send(404, "application/json", "{\"error\":\"unknown catalog request\"}");
-      return;
+    int status = 200;
+    uint32_t cancel_call_id = 0;
+    std::string body;
+    {
+      std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
+      HaEntityCatalogPending *slot = ha_entity_catalog_find(request_id);
+      if (slot == nullptr) {
+        status = 404;
+        body = "{\"error\":\"unknown catalog request\"}";
+      } else if (slot->state == HaEntityCatalogPending::State::PENDING &&
+                 esphome::millis() - slot->created_ms > HA_ENTITY_CATALOG_TIMEOUT_MS) {
+        cancel_call_id = slot->call_id;
+        status = 504;
+        body = ha_entity_catalog_json_status(
+            "error", request_id, "Home Assistant entity catalog request timed out");
+        slot->state = HaEntityCatalogPending::State::FREE;
+      } else if (slot->state == HaEntityCatalogPending::State::PENDING) {
+        // Pending is represented in JSON because the web-server adapter does
+        // not preserve 202 for browser clients.
+        body = ha_entity_catalog_json_status("pending", request_id);
+      } else if (slot->state == HaEntityCatalogPending::State::ERROR) {
+        status = 502;
+        body = ha_entity_catalog_json_status("error", request_id, slot->error.c_str());
+        slot->state = HaEntityCatalogPending::State::FREE;
+      } else {
+        body = slot->body;
+        slot->state = HaEntityCatalogPending::State::FREE;
+      }
     }
-    if (slot->state == HaEntityCatalogPending::State::PENDING) {
-      // The ESP-IDF web-server adapter reports non-200 async responses as
-      // errors to browser fetch clients. Keep the body stateful and use 200
-      // so the client can reliably continue polling.
-      request->send(200, "application/json",
-                    ha_entity_catalog_json_status("pending", request_id).c_str());
-      return;
+    if (cancel_call_id != 0) {
+      ha_cancel_action_response_callback(cancel_call_id, "entity catalog request timed out");
     }
-    if (slot->state == HaEntityCatalogPending::State::ERROR) {
-      const std::string body = ha_entity_catalog_json_status(
-          "error", request_id, slot->error.c_str());
-      request->send(502, "application/json", body.c_str());
-      slot->state = HaEntityCatalogPending::State::FREE;
-      return;
-    }
-    request->send(200, "application/json", slot->body.c_str());
-    slot->state = HaEntityCatalogPending::State::FREE;
+    request->send(status, "application/json", body.c_str());
   }
 
   static void start_request(esphome::web_server_idf::AsyncWebServerRequest *request) {
     const std::string query = request->arg("query");
     if (query.size() > HA_ENTITY_CATALOG_MAX_QUERY) {
       request->send(400, "application/json", "{\"error\":\"query too long\"}");
+      return;
+    }
+    const std::string field = request->arg("field").empty() ? "entity" : request->arg("field");
+    const std::string area = request->arg("area");
+    const std::string device_id = request->arg("device_id");
+    const std::string capabilities = request->arg("capabilities");
+    const bool include_hidden = request->arg("include_hidden") == "1" ||
+                                request->arg("include_hidden") == "true";
+    const bool include_disabled = request->arg("include_disabled") == "1" ||
+                                  request->arg("include_disabled") == "true";
+    const std::string limit = request->arg("limit").empty() ? "25" : request->arg("limit");
+    const std::string cursor = request->arg("cursor").empty() ? "0" : request->arg("cursor");
+    if (field.size() > HA_ENTITY_CATALOG_MAX_FILTER || area.size() > HA_ENTITY_CATALOG_MAX_FILTER ||
+        device_id.size() > HA_ENTITY_CATALOG_MAX_FILTER ||
+        capabilities.size() > HA_ENTITY_CATALOG_MAX_FILTER) {
+      request->send(400, "application/json", "{\"error\":\"filter too long\"}");
+      return;
+    }
+    char *limit_end = nullptr;
+    char *cursor_end = nullptr;
+    const unsigned long parsed_limit = std::strtoul(limit.c_str(), &limit_end, 10);
+    const unsigned long parsed_cursor = std::strtoul(cursor.c_str(), &cursor_end, 10);
+    if (limit_end == limit.c_str() || *limit_end != '\0' || parsed_limit < 1 ||
+        parsed_limit > HA_ENTITY_CATALOG_MAX_LIMIT || cursor_end == cursor.c_str() ||
+        *cursor_end != '\0' || parsed_cursor > HA_ENTITY_CATALOG_MAX_CURSOR) {
+      request->send(400, "application/json", "{\"error\":\"invalid pagination\"}");
       return;
     }
     HaEntityCatalogPending *slot = nullptr;
@@ -236,12 +298,9 @@ class HaEntityCatalogHandler final
     if (stale_call_id != 0) {
       ha_cancel_action_response_callback(stale_call_id, "entity catalog request timed out");
     }
-    const std::string field = request->arg("field").empty() ? "entity" : request->arg("field");
-    const std::string area = request->arg("area");
-    const std::string device_id = request->arg("device_id");
-    const std::string limit = request->arg("limit").empty() ? "25" : request->arg("limit");
-    const std::string cursor = request->arg("cursor").empty() ? "0" : request->arg("cursor");
-    if (!ha_entity_catalog_send(*slot, query, field, area, device_id, limit, cursor)) {
+    if (!ha_entity_catalog_send(
+            *slot, query, field, area, device_id, capabilities, include_hidden,
+            include_disabled, limit, cursor)) {
       std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
       slot->state = HaEntityCatalogPending::State::ERROR;
       slot->error = "Home Assistant is not ready for entity catalog requests";
