@@ -89,20 +89,32 @@ export function createEntityCatalogClient(
     async function search(query: string, domains: string[] = []): Promise<HomeAssistantEntityRecord[]> {
         const active = pairing();
         if (!active) return [];
-        const params = new URLSearchParams({ q: query, field: fieldForDomains(domains), limit: "50" });
-        const response = await fetchImpl(`${active.baseUrl}/api/espcontrol/${encodeURIComponent(active.deviceId)}/entities?${params}`, {
-            headers: { Authorization: `Bearer ${active.token}` },
-            credentials: "omit",
-            cache: "no-store",
-        });
-        if (response.status === 401) {
-            cached = null;
-            try { storage?.removeItem(STORAGE_KEY); } catch (_) { /* storage is optional */ }
-            return [];
+        const entities: HomeAssistantEntityRecord[] = [];
+        let cursor = 0;
+        for (let pageNumber = 0; pageNumber < 100; pageNumber += 1) {
+            const params = new URLSearchParams({
+                q: query,
+                field: fieldForDomains(domains),
+                limit: "100",
+                cursor: String(cursor),
+            });
+            const response = await fetchImpl(`${active.baseUrl}/api/espcontrol/${encodeURIComponent(active.deviceId)}/entities?${params}`, {
+                headers: { Authorization: `Bearer ${active.token}` },
+                credentials: "omit",
+                cache: "no-store",
+            });
+            if (response.status === 401) {
+                cached = null;
+                try { storage?.removeItem(STORAGE_KEY); } catch (_) { /* storage is optional */ }
+                return [];
+            }
+            if (!response.ok) return [];
+            const page = await response.json() as HomeAssistantEntityPage;
+            if (Array.isArray(page.entities)) entities.push(...page.entities);
+            if (page.next_cursor === null || typeof page.next_cursor !== "number" || page.next_cursor <= cursor) break;
+            cursor = page.next_cursor;
         }
-        if (!response.ok) return [];
-        const page = await response.json() as HomeAssistantEntityPage;
-        return Array.isArray(page.entities) ? page.entities : [];
+        return entities;
     }
     return { pairing, savePairing, importPairing, search };
 }
