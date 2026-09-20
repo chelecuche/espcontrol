@@ -213,8 +213,11 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
         });
         return ids.map(function (this: any, id?: any) {
             var record: any = records[id];
-            var context: any = record && [record.area_name, record.device_name].filter(Boolean).join(" • ");
-            return { value: id, label: optionLabelForEntity(id), context: context };
+            return {
+                value: id,
+                label: record && record.name ? String(record.name) : optionLabelForEntity(id),
+                location: record && record.area_name ? String(record.area_name) : "",
+            };
         });
     }
     function ensureEntityDropdown(this: any, input?: any) {
@@ -250,13 +253,23 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             if (!query)
                 return true;
             return item.value.toLowerCase().indexOf(query) !== -1 ||
-                item.label.toLowerCase().indexOf(query) !== -1;
+                item.label.toLowerCase().indexOf(query) !== -1 ||
+                item.location.toLowerCase().indexOf(query) !== -1;
         });
         items.forEach(function (this: any, item?: any) {
             var option: any = document.createElement("button");
             option.type = "button";
             option.className = "sp-entity-option";
-            option.textContent = item.context ? item.label + " • " + item.context + " (" + item.value + ")" : item.label + " (" + item.value + ")";
+            var name: any = document.createElement("span");
+            name.className = "sp-entity-option-name";
+            name.textContent = item.label;
+            option.appendChild(name);
+            if (item.location) {
+                var location: any = document.createElement("span");
+                location.className = "sp-entity-option-location";
+                location.textContent = item.location;
+                option.appendChild(location);
+            }
             option.addEventListener("mousedown", function (this: any, e?: any) {
                 e.preventDefault();
                 input._entitySuppressDropdown = true;
