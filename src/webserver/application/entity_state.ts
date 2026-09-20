@@ -236,6 +236,12 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
         if (input && input._entityDropdown)
             input._entityDropdown.classList.remove("sp-open");
     }
+    function showSelectedEntityLabel(this: any, input?: any) {
+        if (!input || !input._entityValue || !input._entityDisplayValue || document.activeElement === input)
+            return;
+        if (String(input.value || "") === String(input._entityValue))
+            input.value = input._entityDisplayValue;
+    }
     function refreshEntityDatalist(this: any, input?: any) {
         if (!input)
             return;
@@ -273,12 +279,16 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             option.addEventListener("mousedown", function (this: any, e?: any) {
                 e.preventDefault();
                 input._entitySuppressDropdown = true;
+                input._entityValue = item.value;
+                input._entityDisplayValue = item.label;
                 input.value = item.value;
                 rememberEntityName(item.value, item.label || titleFromEntityId(item.value));
                 input.dispatchEvent(new Event("input", { bubbles: true }));
                 input.dispatchEvent(new Event("change", { bubbles: true }));
                 closeEntityDropdown(input);
                 input._entitySuppressDropdown = false;
+                input.blur();
+                setTimeout(function (this: any) { showSelectedEntityLabel(input); }, 0);
             });
             dropdown.appendChild(option);
         });
@@ -364,14 +374,25 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
         input._entityCatalogCache = {};
         input._remoteEntityGeneration = 0;
         input._remoteEntityLoading = false;
-        input.addEventListener("focus", function (this: any) { refreshEntityDatalist(input); });
+        input.addEventListener("focus", function (this: any) {
+            if (input._entityValue && input._entityDisplayValue && input.value === input._entityDisplayValue) {
+                input.value = input._entityValue;
+                input.select();
+            }
+            refreshEntityDatalist(input);
+        });
         input.addEventListener("input", function (this: any) {
+            if (input._entityValue && String(input.value || "") !== String(input._entityValue)) {
+                input._entityValue = "";
+                input._entityDisplayValue = "";
+            }
             input._remoteEntityError = null;
             rememberEntityName(input.value, optionLabelForEntity(input.value));
             refreshEntityDatalist(input);
         });
         input.addEventListener("blur", function (this: any) {
             setTimeout(function (this: any) { closeEntityDropdown(input); }, 120);
+            setTimeout(function (this: any) { showSelectedEntityLabel(input); }, 0);
         });
         input.addEventListener("keydown", function (this: any, e?: any) {
             if (e.key === "Escape")
