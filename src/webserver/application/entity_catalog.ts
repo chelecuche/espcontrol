@@ -56,6 +56,7 @@ export function createEntityCatalogClient(
     async function search(query: string, domains: string[] = []): Promise<HomeAssistantEntityRecord[]> {
         const entities: HomeAssistantEntityRecord[] = [];
         let cursor = 0;
+        let complete = false;
         for (let pageNumber = 0; pageNumber < 200; pageNumber += 1) {
             const params = new URLSearchParams({
                 query,
@@ -91,9 +92,13 @@ export function createEntityCatalogClient(
             }
             if (!page || !Array.isArray(page.entities)) throw new Error("Home Assistant entity catalog timed out");
             entities.push(...page.entities);
-            if (page.next_cursor === null || typeof page.next_cursor !== "number" || page.next_cursor <= cursor) break;
+            if (page.next_cursor === null || typeof page.next_cursor !== "number" || page.next_cursor <= cursor) {
+                complete = true;
+                break;
+            }
             cursor = page.next_cursor;
         }
+        if (!complete) throw new Error("Home Assistant entity catalog exceeded the page limit");
         return entities;
     }
     return { search };
