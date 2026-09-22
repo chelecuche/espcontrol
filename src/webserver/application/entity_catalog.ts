@@ -61,9 +61,10 @@ function fieldForDomains(domains: string[]): string {
         return "action";
     }
     const mapped = domains.map((domain) => fields[domain]).filter(Boolean);
+    const commonField = mapped[0];
     if (normalized.size > 1 && mapped.length === domains.length &&
-        mapped.every((field) => field === mapped[0])) {
-        return mapped[0];
+        commonField && mapped.every((field) => field === commonField)) {
+        return commonField;
     }
     const first = domains[0];
     if (domains.length === 1 && first && fields[first]) return fields[first];
