@@ -12,6 +12,7 @@
 
 #include "button_grid_ha.h"
 #include "ha_catalog_contract.h"
+#include "ha_entity_catalog_policy.h"
 #include "esphome/components/json/json_util.h"
 #include "esphome/components/web_server_idf/web_server_idf.h"
 #include "panel_identity.h"
@@ -301,7 +302,7 @@ class HaEntityCatalogHandler final
     const std::string cursor = request->arg("cursor").empty() ? "0" : request->arg("cursor");
     if (field.size() > catalog_contract::MAX_FIELD_LENGTH || area.size() > HA_ENTITY_CATALOG_MAX_FILTER ||
         device_id.size() > HA_ENTITY_CATALOG_MAX_FILTER ||
-        capabilities.size() > HA_ENTITY_CATALOG_MAX_FILTER) {
+        !ha_entity_catalog_capabilities_valid(capabilities)) {
       request->send(400, "application/json", "{\"error\":\"filter too long\"}");
       return;
     }

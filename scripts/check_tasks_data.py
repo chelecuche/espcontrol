@@ -88,6 +88,8 @@ TASKS = (
          domains=("firmware",),
          inputs=(
              "tests/firmware/**",
+             "components/espcontrol/ha_catalog_contract.h",
+             "components/espcontrol/ha_entity_catalog_policy.h",
              "components/espcontrol/device_reset.*",
              "components/espcontrol/reset_policy.h",
              "components/espcontrol/reset_interlock.h",
