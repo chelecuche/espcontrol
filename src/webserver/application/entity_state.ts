@@ -211,12 +211,24 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             var bl: any = optionLabelForEntity(b).toLowerCase();
             return al === bl ? a.localeCompare(b) : al.localeCompare(bl);
         });
+        var presentationCounts: any = {};
+        ids.forEach(function (this: any, id?: any) {
+            var record: any = records[id];
+            var label: any = record && record.name ? String(record.name) : optionLabelForEntity(id);
+            var location: any = record && record.area_name ? String(record.area_name) : "";
+            var key: any = (label + "\u0000" + location).toLowerCase();
+            presentationCounts[key] = (presentationCounts[key] || 0) + 1;
+        });
         return ids.map(function (this: any, id?: any) {
             var record: any = records[id];
+            var label: any = record && record.name ? String(record.name) : optionLabelForEntity(id);
+            var location: any = record && record.area_name ? String(record.area_name) : "";
+            var key: any = (label + "\u0000" + location).toLowerCase();
             return {
                 value: id,
-                label: record && record.name ? String(record.name) : optionLabelForEntity(id),
-                location: record && record.area_name ? String(record.area_name) : "",
+                label: label,
+                location: location,
+                showValue: presentationCounts[key] > 1,
             };
         });
     }
@@ -262,7 +274,7 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                 item.label.toLowerCase().indexOf(query) !== -1 ||
                 item.location.toLowerCase().indexOf(query) !== -1;
         });
-        items.forEach(function (this: any, item?: any) {
+        items.slice(0, 12).forEach(function (this: any, item?: any) {
             var option: any = document.createElement("button");
             option.type = "button";
             option.className = "sp-entity-option";
@@ -275,6 +287,12 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                 location.className = "sp-entity-option-location";
                 location.textContent = item.location;
                 option.appendChild(location);
+            }
+            if (item.showValue) {
+                var id: any = document.createElement("span");
+                id.className = "sp-entity-option-id";
+                id.textContent = item.value;
+                option.appendChild(id);
             }
             option.addEventListener("mousedown", function (this: any, e?: any) {
                 e.preventDefault();
@@ -308,7 +326,8 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             retry.textContent = "Retry search";
             retry.addEventListener("mousedown", function (this: any, e?: any) {
                 e.preventDefault();
-                input._remoteEntityQuery = null;
+                input._remoteEntityRetryRequired = false;
+                input._remoteEntityQuery = "";
                 refreshEntityDatalist(input);
             });
             dropdown.appendChild(retry);
@@ -318,11 +337,24 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             empty.textContent = "No matching Home Assistant entities.";
             dropdown.appendChild(empty);
         }
-        dropdown.classList.toggle("sp-open", document.activeElement === input &&
-            (items.length > 0 || input._remoteEntityLoading || !!input._remoteEntityError));
         var remoteQuery: any = String(input.value || "").trim();
-        if (entityCatalog && input._remoteEntityQuery !== remoteQuery) {
+        var remoteQueryComplete: any = remoteQuery && input._remoteEntityCompleteQuery === remoteQuery;
+        dropdown.classList.toggle("sp-open", document.activeElement === input &&
+            (items.length > 0 || input._remoteEntityLoading || !!input._remoteEntityError || remoteQueryComplete));
+        if (!remoteQuery) {
+            if (input._remoteEntityTimer) {
+                clearTimeout(input._remoteEntityTimer);
+                input._remoteEntityTimer = null;
+            }
+            input._remoteEntityQuery = "";
+            input._remoteEntityCompleteQuery = "";
+            return;
+        }
+        if (document.activeElement === input && entityCatalog && !input._remoteEntityRetryRequired &&
+            input._remoteEntityQuery !== remoteQuery && !input._remoteEntityRequest &&
+            !input._remoteEntityTimer) {
             input._remoteEntityQuery = remoteQuery;
+            input._remoteEntityCompleteQuery = null;
             input._remoteEntityLoading = true;
             input._remoteEntityError = null;
             input._remoteEntityGeneration = (input._remoteEntityGeneration || 0) + 1;
@@ -333,6 +365,7 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             if (cached) {
                 cached.forEach(function (this: any, record?: any) { rememberEntityRecord(record); });
                 input._remoteEntityLoading = false;
+                input._remoteEntityCompleteQuery = remoteQuery;
                 refreshEntityDatalist(input);
             } else {
                 if (input._remoteEntityTimer)
@@ -345,6 +378,7 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                         input._remoteEntityRequest = null;
                         input._remoteEntityLoading = false;
                         input._remoteEntityError = null;
+                        input._remoteEntityCompleteQuery = remoteQuery;
                         var result: any[] = records || [];
                         if (!input._entityCatalogCache)
                             input._entityCatalogCache = {};
@@ -358,6 +392,9 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                             return;
                         input._remoteEntityRequest = null;
                         input._remoteEntityLoading = false;
+                        input._remoteEntityRetryRequired = true;
+                        input._remoteEntityQuery = "";
+                        input._remoteEntityCompleteQuery = null;
                         input._remoteEntityError = "Home Assistant entity search is unavailable. Check the ESPHome connection and retry.";
                         refreshEntityDatalist(input);
                     });
@@ -373,6 +410,9 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
         input._entitySuggestionsAttached = true;
         input._entityCatalogCache = {};
         input._remoteEntityGeneration = 0;
+        input._remoteEntityQuery = "";
+        input._remoteEntityCompleteQuery = "";
+        input._remoteEntityRetryRequired = false;
         input._remoteEntityLoading = false;
         input.addEventListener("focus", function (this: any) {
             if (input._entityValue && input._entityDisplayValue && input.value === input._entityDisplayValue) {
@@ -387,6 +427,8 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
                 input._entityDisplayValue = "";
             }
             input._remoteEntityError = null;
+            input._remoteEntityRetryRequired = false;
+            input._remoteEntityCompleteQuery = null;
             rememberEntityName(input.value, optionLabelForEntity(input.value));
             refreshEntityDatalist(input);
         });
@@ -404,6 +446,11 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
     function entityInput(this: any, id?: any, value?: any, placeholder?: any, domains?: any) {
         var el: any = dependencies.textInput(id, value, placeholder);
         return attachEntitySuggestions(el, domains);
+    }
+    function entityValue(this: any, input?: any) {
+        if (!input)
+            return "";
+        return input._entityValue || input.value || "";
     }
     function rememberEntityPostPath(this: any, data?: any) {
         var preferred: any = parseEntityId(data && data.name_id) || parseEntityId(data && data.id);
@@ -478,6 +525,7 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
         refreshEntityDatalist,
         attachEntitySuggestions,
         entityInput,
+        entityValue,
         rememberEntityPostPath,
         rememberedPostUrls,
         hasRememberedPostPath,

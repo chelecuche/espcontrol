@@ -310,6 +310,8 @@ export function createWebStyles(dragAnimation: boolean): string {
         ".sp-card-badge.sp-hidden{display:none}" +
         ".sp-panel{background:var(--surface);border-radius:var(--radius);padding:24px;" +
         "margin-bottom:var(--gap);border:1px solid var(--border)}" +
+        ".sp-camera-settings{display:flex;flex-direction:column;gap:24px;margin-bottom:0}" +
+        ".sp-camera-settings>.sp-field,.sp-camera-settings>.sp-toggle-row{margin-bottom:0}" +
         ".sp-field{margin-bottom:24px}.sp-field.sp-hidden{display:none}.sp-field:last-child{margin-bottom:0}" +
         ".sp-field.sp-icon-on-field:last-child{margin-bottom:44px}" +
         ".sp-state-translation-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px 14px;margin-bottom:28px}" +
@@ -366,6 +368,7 @@ export function createWebStyles(dragAnimation: boolean): string {
         "cursor:pointer;box-sizing:border-box}" +
         ".sp-entity-option-name{display:block;color:var(--text);font-size:var(--text-md);font-weight:400;line-height:1.35}" +
         ".sp-entity-option-location{display:block;margin-top:2px;color:var(--text2);font-size:var(--text-sm);font-weight:400;line-height:1.35}" +
+        ".sp-entity-option-id{display:block;margin-top:2px;color:var(--text2);font-size:var(--text-xs);font-weight:400;line-height:1.25}" +
         ".sp-entity-option:hover,.sp-entity-option:focus{background:var(--accent-soft);outline:none}" +
         ".sp-entity-catalog-status{padding:10px 12px;color:var(--text3);font-size:.8rem;line-height:1.35}" +
         ".sp-entity-catalog-error{padding:10px 12px;color:#f66f81;font-size:.8rem;line-height:1.35}" +

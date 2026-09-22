@@ -70,6 +70,10 @@
       "ntpServer3": "time.google.com",
       "screensaverMode": "disabled",
       "presenceSensorEntity": "",
+      "screensaverCameraEntity": "",
+      "screensaverMetadataEntity": "",
+      "metadataOverlay": false,
+      "screensaverCameraImageMode": "Fit",
       "mediaPlayerSleepPrevention": true,
       "mediaPlayerSleepPreventionEntity": "",
       "coverArtScreensaver": false,
@@ -86,6 +90,7 @@
       "updateFrequency": "Weekly",
       "screensaverAction": "off",
       "clockScreensaver": false,
+      "clockOverlay": false,
       "clockBrightnessDay": 35,
       "clockBrightnessNight": 35,
       "screensaverDimmedBrightness": 10,
@@ -184,8 +189,8 @@
     ]
   },
   "bundleSize": {
-    "minified": 2619436,
-    "gzip": 1094262,
+    "minified": 2631103,
+    "gzip": 1097566,
     "gzipTolerance": 9216
   }
 }

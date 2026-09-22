@@ -39,6 +39,7 @@ test("entity catalog accepts pending responses and follows pagination", async ()
 
   assert.deepEqual(records.map((record) => record.entity_id), ["light.kitchen", "light.office"]);
   assert.match(requests[0], /field=light/);
+  assert.match(requests[0], /limit=25/);
   assert.match(requests[2], /cursor=1/);
 });
 

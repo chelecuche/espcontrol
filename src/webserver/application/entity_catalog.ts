@@ -28,11 +28,20 @@ function fieldForDomains(domains: string[]): string {
             if ([...normalized].every((domain) => accepted.includes(domain))) return field;
         }
     }
+    const mapped = domains.map((domain) => fields[domain]).filter(Boolean);
+    const commonField = mapped[0];
+    if (normalized.size > 1 && mapped.length === domains.length &&
+        commonField && mapped.every((field) => field === commonField)) {
+        return commonField;
+    }
     const first = domains[0];
     return domains.length === 1 && first ? fields[first] || "entity" : "entity";
 }
 
 const SEARCH_PATH = "/api/v1/ha/entities/search";
+// Keep each native response below HA_ENTITY_CATALOG_MAX_BODY even when HA
+// includes long names, areas, devices, states, and capability metadata.
+const PAGE_LIMIT = CATALOG_TRANSPORTS.native.default_limit;
 const POLL_DELAY_MS = 100;
 const MAX_POLLS = 150;
 
@@ -62,7 +71,7 @@ export function createEntityCatalogClient(
             const params = new URLSearchParams({
                 query,
                 field: fieldForDomains(domains),
-                limit: String(CATALOG_TRANSPORTS.native.max_limit),
+                limit: String(PAGE_LIMIT),
                 cursor: String(cursor),
             });
             if (options.area) params.set("area", options.area);
