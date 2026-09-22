@@ -59,7 +59,7 @@
       "temperatureDegreeSymbol": true,
       "subpageChevron": true,
       "timezone": "Europe/London (GMT+0)",
-      "temperatureUnit": "\u00b0F",
+      "temperatureUnit": "°F",
       "language": "en",
       "clockFormat": "12h",
       "hasNtpServer1": false,
@@ -70,6 +70,10 @@
       "ntpServer3": "time.google.com",
       "screensaverMode": "disabled",
       "presenceSensorEntity": "",
+      "screensaverCameraEntity": "",
+      "screensaverMetadataEntity": "",
+      "metadataOverlay": false,
+      "screensaverCameraImageMode": "Fit",
       "mediaPlayerSleepPrevention": true,
       "mediaPlayerSleepPreventionEntity": "",
       "coverArtScreensaver": false,
@@ -86,6 +90,7 @@
       "updateFrequency": "Weekly",
       "screensaverAction": "off",
       "clockScreensaver": false,
+      "clockOverlay": false,
       "clockBrightnessDay": 35,
       "clockBrightnessNight": 35,
       "screensaverDimmedBrightness": 10,
@@ -184,8 +189,8 @@
     ]
   },
   "bundleSize": {
-    "minified": 2619929,
-    "gzip": 1102385,
+    "minified": 2630184,
+    "gzip": 1104909,
     "gzipTolerance": 9216
   }
 }
