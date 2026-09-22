@@ -72,6 +72,9 @@ function fieldForDomains(domains: string[]): string {
 }
 
 const SEARCH_PATH = "/api/v1/ha/entities/search";
+// Keep each native response below HA_ENTITY_CATALOG_MAX_BODY even when HA
+// includes long names, areas, devices, states, and capability metadata.
+const PAGE_LIMIT = 25;
 const POLL_DELAY_MS = 100;
 const MAX_POLLS = 150;
 
@@ -101,7 +104,7 @@ export function createEntityCatalogClient(
             const params = new URLSearchParams({
                 query,
                 field: fieldForDomains(domains),
-                limit: "50",
+                limit: String(PAGE_LIMIT),
                 cursor: String(cursor),
             });
             if (options.area) params.set("area", options.area);
