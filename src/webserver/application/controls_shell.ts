@@ -1,8 +1,31 @@
 import type { AppState } from "../state/types";
 import type { UiRuntimeState } from "./state";
 
+declare const __ESPCONTROL_LOGO_SVG__: string;
+
+export function renderPanelBrand(brand: Element, document: Document, name?: string): void {
+    brand.textContent = "";
+    const logo = document.createElement("img");
+    logo.className = "sp-brand-logo";
+    logo.src = "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(__ESPCONTROL_LOGO_SVG__);
+    logo.alt = "";
+    logo.setAttribute("aria-hidden", "true");
+    brand.appendChild(logo);
+    const title = document.createElement("span");
+    title.className = "sp-brand-title";
+    title.textContent = "EspControl";
+    brand.appendChild(title);
+    if (name) {
+        const label = document.createElement("span");
+        label.className = "sp-brand-name";
+        label.textContent = " " + name;
+        brand.appendChild(label);
+    }
+}
+
 export interface ControlsShellDependencies {
     readonly document: Document;
+    readonly panelName?: () => string | undefined;
     readonly state: AppState;
     readonly schedule: typeof setTimeout;
     readonly cancelSchedule: (handle: any) => void;
@@ -112,7 +135,7 @@ export function createControlsShellFeature(
         header.className = "sp-header";
         var brand: any = document.createElement("div");
         brand.className = "sp-brand";
-        brand.textContent = "EspControl";
+        renderPanelBrand(brand, document, dependencies.panelName?.());
         header.appendChild(brand);
         var nav: any = document.createElement("nav");
         nav.className = "sp-nav";

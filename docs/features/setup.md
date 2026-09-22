@@ -48,6 +48,7 @@ The setup page uses these card names and grouped modes on the device. For a quic
 | **[Garage Door](/card-types/garage-doors)** | Controls a garage door cover entity with an open/close tap action. | Yes |
 | **[Lock](/card-types/locks)** | Locks, unlocks, or toggles a Home Assistant lock entity. | Yes |
 | **[Alarm](/card-types/alarms)** | Arms, disarms, or shows a Home Assistant alarm control panel. | Yes, as an alarm control panel entity |
+| **[Timer](/card-types/timers)** | Starts, cancels, or resumes a Home Assistant timer and shows its countdown. | Yes, as a timer entity |
 | **[Date & Time](/card-types/calendar)** | Shows the local clock, date, date and time, or a world clock. | No |
 | **[Weather](/card-types/weather)** | Shows the current condition or today's/tomorrow's forecast from a weather entity. | Yes, as **Weather Entity** |
 | **[Media](/card-types/media)** | Controls playback, volume, track position, or now-playing details for a media player. | Yes, as a media player entity |
@@ -102,13 +103,23 @@ If a card already occupies the space needed for a larger size, the setup page tr
 
 ## Device Settings
 
-The **Settings** tab also includes display, brightness, screensaver, backup, and firmware update controls.
+The **Settings** tab groups the current controls as follows. Open a card to see its options; some options appear only when their feature is enabled.
 
-![Settings tab showing appearance, backlight, schedule, clock, and firmware controls](/images/settings-tab-display.png)
+| Section | Settings |
+|---|---|
+| **Display** | [Appearance](/features/appearance), [Backlight](/features/backlight), [Idle](/features/idle), [Clock Bar](/features/clock-bar), [Rotation](/features/rotation) |
+| **Voice & Sounds** | [Voice Services](/features/voice-control#turn-on-voice-services), [Alarm Audio](/card-types/alarms#entry-and-exit-delays) |
+| **Sleep & Schedule** | [Cover Art Screen Saver](/features/media-cover-art), [Screensaver](/features/screensaver), [Night Schedule](/features/screen-schedule) |
+| **Preferences** | [Language](/features/language), [Time](/features/clock), [Temperature](/features/temperature) |
+| **System** | [Device Name](#naming-your-panel), [Backup](/features/backup), [Firmware](/features/firmware-updates), [Home Assistant Settings](#home-assistant-settings), [Battery](/features/battery), [Factory Reset](/features/backup#reset-the-display) |
+
+Device-specific cards, including Voice Services, Alarm Audio, Rotation, and Battery, appear only on supported panels. Device Name and Factory Reset also require firmware that supports them.
+
+### Home Assistant Settings
 
 Open **Settings > System > Home Assistant Settings** to manage the address used for camera/image cards and media artwork downloads. **Automatic** connection mode discovers the HTTP endpoint advertised by the connected Home Assistant instance, including port `80` used by new Home Assistant OS installations and port `8123` commonly used by existing installations and Home Assistant Container.
 
-If automatic discovery is unavailable because multicast traffic is blocked between network segments, select **Manual** and enter the protocol and port shown under **Home Assistant > Settings > System > Network**. Automatic mode keeps these values as its fallback. EspControl never rewrites complete artwork URLs supplied by media services or external CDNs.
+If automatic discovery is unavailable because multicast traffic is blocked between network segments, select **Manual** and set **Home Assistant Protocol** (`http` or `https`) and **Home Assistant Port** (1–65535) to the values shown under **Home Assistant > Settings > System > Network**. Automatic mode keeps these values as its fallback. EspControl never rewrites complete artwork URLs supplied by media services or external CDNs.
 
 ## Apply Configuration
 
@@ -140,3 +151,23 @@ actions:
 ```
 
 The web setup page's **Apply Configuration** button remains separate: use it after saving web settings, and use the Home Assistant **Restart** entity when you only need to restart the display.
+
+## Naming Your Panel
+
+On firmware that supports panel naming, open **Settings > System > Device Name**.
+Enter a name such as **Kitchen**, check the address preview, then choose
+**Save & Restart**. The name appears in the web interface, browser tab, the
+panel's network information and Home Assistant. The address becomes something
+like `kitchen-b2c3.local`; the four-character suffix comes from the panel's MAC address.
+
+The page shows the new address and current IP before restarting. Reopen the panel
+using either link. Router-managed DNS entries may need updating separately.
+Clearing the name restores the firmware's original name and address. Normal OTA
+updates retain your custom name; older firmware without naming support uses its
+compiled defaults.
+
+Home Assistant should update the existing device after reconnecting. A name you
+assigned manually in Home Assistant takes precedence. Existing entity IDs remain
+unchanged, but custom ESPHome action names include the hostname: update automations
+using actions such as `esphome.<old_name>_navigate`. Reload the ESPHome integration
+if its action list still shows the previous names.

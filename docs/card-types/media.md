@@ -14,7 +14,7 @@ A Media card controls a Home Assistant `media_player`. Choose a small one-job ca
 
 1. Select a card and change its type to **Media**. New Media cards start as **Cover Art**.
 2. Choose a **Type** and enter the player entity, such as `media_player.living_room`.
-3. Set a label or icon where the chosen type offers one.
+3. For **Cover Art** and **All Controls**, enter a **Name** below Entity. This appears in the clock bar while the media popup is open. All Controls also uses it on the card when Label is selected. Other types offer a label or icon where supported.
 
 | Type | Best for |
 |---|---|
@@ -42,7 +42,7 @@ Cover Art is available in square **1×1**, **2×2**, and **3×3** card sizes. It
 
 ## Speaker Groups
 
-For speaker groups, first confirm the speakers can join in Home Assistant. EspControl uses the compatible-player list supplied by the configured discovery entity; by default this is `sensor.speaker_group`. The group screen stays hidden when no usable speakers are reported.
+Use **Speaker Group** to open the speaker controls directly, or access them from **All Controls**. Follow the [Speaker Groups setup guide](/features/speaker-groups) for the Home Assistant discovery sensor templates, Music Assistant options, card setup, group volume, and troubleshooting.
 
 ::: info Requires Home Assistant actions
 Media cards send Home Assistant actions. If a control does not respond, check [Enable Actions](/getting-started/home-assistant-actions).
