@@ -129,6 +129,10 @@ These are true after every completed transition:
 3. The dim touch guard is visible only for `DIMMED`; wake guards exist only for
    their bounded touch-release or timeout window.
 4. `DISPLAY_OFF` means the logical backlight is off and physical PWM is off.
+   Fade samples do not publish intermediate brightness. The final off action
+   checks both current and remote light state, so Home Assistant receives OFF
+   even when the last fade sample has already turned the physical light off.
+   Repeated off checks do not republish or save the same state.
    Every non-off mode has logical mode, PWM, and selected brightness aligned.
 5. The clock brightness source is scheduled-clock brightness for a schedule-owned
    clock and day/night clock brightness for an idle-owned clock.

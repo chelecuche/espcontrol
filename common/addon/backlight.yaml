@@ -850,7 +850,12 @@ script:
     then:
       - if:
           condition:
-            light.is_on: display_backlight
+            lambda: |-
+              // Fade samples update current_values without publishing. The
+              // final sample can already be OFF while Home Assistant still
+              // sees ON, so finalize both the physical and reported state.
+              return id(display_backlight).current_values.is_on() ||
+                     id(display_backlight).remote_values.is_on();
           then:
             - light.turn_off:
                 id: display_backlight
