@@ -250,12 +250,12 @@ class HaEntityCatalogHandler final
  private:
   static bool origin_allowed(esphome::web_server_idf::AsyncWebServerRequest *request) {
     const auto origin = request->get_header("Origin");
-    if (!origin.has_value() || origin->empty()) return true;
     // Browser fetches include an independent Fetch Metadata signal. Reject a
     // cross-site request even when DNS rebinding makes the Host header match
     // the attacker's Origin; scripts cannot set this header themselves.
     const auto fetch_site = request->get_header("Sec-Fetch-Site");
     if (fetch_site.has_value() && *fetch_site != "same-origin") return false;
+    if (!origin.has_value() || origin->empty()) return true;
     const auto scheme_end = origin->find("://");
     if (scheme_end == std::string::npos) return false;
     const size_t authority_start = scheme_end + 3;

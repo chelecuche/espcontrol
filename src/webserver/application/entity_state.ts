@@ -350,7 +350,7 @@ export function createEntityStateFeature(dependencies: EntityStateDependencies) 
             input._remoteEntityCompleteQuery = "";
             return;
         }
-        if (entityCatalog && !input._remoteEntityRetryRequired &&
+        if (document.activeElement === input && entityCatalog && !input._remoteEntityRetryRequired &&
             input._remoteEntityQuery !== remoteQuery && !input._remoteEntityRequest &&
             !input._remoteEntityTimer) {
             input._remoteEntityQuery = remoteQuery;
