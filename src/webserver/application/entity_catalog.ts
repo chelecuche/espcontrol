@@ -60,6 +60,11 @@ function fieldForDomains(domains: string[]): string {
     if (normalized.size > 1 && [...normalized].every((domain) => actionDomains.has(domain))) {
         return "action";
     }
+    const mapped = domains.map((domain) => fields[domain]).filter(Boolean);
+    if (normalized.size > 1 && mapped.length === domains.length &&
+        mapped.every((field) => field === mapped[0])) {
+        return mapped[0];
+    }
     const first = domains[0];
     if (domains.length === 1 && first && fields[first]) return fields[first];
     return "entity";

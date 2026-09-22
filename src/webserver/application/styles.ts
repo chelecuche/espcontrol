@@ -366,6 +366,7 @@ export function createWebStyles(dragAnimation: boolean): string {
         "cursor:pointer;box-sizing:border-box}" +
         ".sp-entity-option-name{display:block;color:var(--text);font-size:var(--text-md);font-weight:400;line-height:1.35}" +
         ".sp-entity-option-location{display:block;margin-top:2px;color:var(--text2);font-size:var(--text-sm);font-weight:400;line-height:1.35}" +
+        ".sp-entity-option-id{display:block;margin-top:2px;color:var(--text2);font-size:var(--text-xs);font-weight:400;line-height:1.25}" +
         ".sp-entity-option:hover,.sp-entity-option:focus{background:var(--accent-soft);outline:none}" +
         ".sp-entity-catalog-status{padding:10px 12px;color:var(--text3);font-size:.8rem;line-height:1.35}" +
         ".sp-entity-catalog-error{padding:10px 12px;color:#f66f81;font-size:.8rem;line-height:1.35}" +

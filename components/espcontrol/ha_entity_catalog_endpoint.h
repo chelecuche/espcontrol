@@ -12,6 +12,7 @@
 
 #include "button_grid_ha.h"
 #include "esphome/components/json/json_util.h"
+#include "esphome/components/network/ip_address.h"
 #include "esphome/components/web_server_idf/web_server_idf.h"
 #include "panel_identity.h"
 
@@ -21,6 +22,7 @@ namespace espcontrol {
 // cannot safely be retained while an ESPHome action is travelling to HA.
 constexpr size_t HA_ENTITY_CATALOG_MAX_PENDING = 2;
 constexpr uint32_t HA_ENTITY_CATALOG_TIMEOUT_MS = 15000;
+constexpr uint32_t HA_ENTITY_CATALOG_RESULT_RETENTION_MS = 60000;
 constexpr size_t HA_ENTITY_CATALOG_MAX_QUERY = 120;
 constexpr size_t HA_ENTITY_CATALOG_MAX_FILTER = 120;
 constexpr size_t HA_ENTITY_CATALOG_MAX_BODY = 24000;
@@ -87,6 +89,7 @@ inline void ha_entity_catalog_complete(uint32_t request_id,
   if (slot == nullptr || slot->state != HaEntityCatalogPending::State::PENDING) return;
   if (!response.is_success()) {
     slot->state = HaEntityCatalogPending::State::ERROR;
+    slot->created_ms = esphome::millis();
     slot->error = response.get_error_message().c_str();
     return;
   }
@@ -94,6 +97,7 @@ inline void ha_entity_catalog_complete(uint32_t request_id,
   auto payload = root["response"];
   if (payload.isNull()) {
     slot->state = HaEntityCatalogPending::State::ERROR;
+    slot->created_ms = esphome::millis();
     slot->error = "Home Assistant returned no catalog response";
     return;
   }
@@ -101,16 +105,28 @@ inline void ha_entity_catalog_complete(uint32_t request_id,
   serializeJson(payload, slot->body);
   if (slot->body.empty()) {
     slot->state = HaEntityCatalogPending::State::ERROR;
+    slot->created_ms = esphome::millis();
     slot->error = "Home Assistant returned an empty catalog response";
     return;
   }
   if (slot->body.size() > HA_ENTITY_CATALOG_MAX_BODY) {
     slot->body.clear();
     slot->state = HaEntityCatalogPending::State::ERROR;
+    slot->created_ms = esphome::millis();
     slot->error = "Home Assistant entity catalog response is too large";
     return;
   }
   slot->state = HaEntityCatalogPending::State::COMPLETE;
+  slot->created_ms = esphome::millis();
+}
+
+inline void ha_entity_catalog_schedule_cancel(uint32_t call_id, std::string reason) {
+  if (call_id == 0) return;
+  esphome::App.scheduler.set_timeout(
+      nullptr, call_id, 0,
+      [call_id, reason = std::move(reason)]() {
+        ha_cancel_action_response_callback(call_id, reason.c_str());
+      });
 }
 
 inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
@@ -153,7 +169,7 @@ inline bool ha_entity_catalog_send(HaEntityCatalogPending &slot,
     return false;
   }
   if (!ha_action_send(request)) {
-    ha_cancel_action_response_callback(call_id, "Home Assistant action could not be sent");
+    ha_entity_catalog_schedule_cancel(call_id, "Home Assistant action could not be sent");
     return false;
   }
   return true;
@@ -193,6 +209,7 @@ inline void ha_entity_catalog_schedule_send(
         std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
         if (slot->state == HaEntityCatalogPending::State::PENDING) {
           slot->state = HaEntityCatalogPending::State::ERROR;
+          slot->created_ms = esphome::millis();
           slot->error = "Home Assistant is not ready for entity catalog requests";
         }
       });
@@ -234,9 +251,45 @@ class HaEntityCatalogHandler final
   static bool origin_allowed(esphome::web_server_idf::AsyncWebServerRequest *request) {
     const auto origin = request->get_header("Origin");
     if (!origin.has_value() || origin->empty()) return true;
-    const auto host = request->get_header("Host");
-    if (!host.has_value() || host->empty()) return false;
-    return *origin == "http://" + *host || *origin == "https://" + *host;
+    // Browser fetches include an independent Fetch Metadata signal. Reject a
+    // cross-site request even when DNS rebinding makes the Host header match
+    // the attacker's Origin; scripts cannot set this header themselves.
+    const auto fetch_site = request->get_header("Sec-Fetch-Site");
+    if (fetch_site.has_value() && *fetch_site != "same-origin") return false;
+    const auto scheme_end = origin->find("://");
+    if (scheme_end == std::string::npos) return false;
+    const size_t authority_start = scheme_end + 3;
+    const size_t authority_end = origin->find('/', authority_start);
+    const std::string authority = origin->substr(
+        authority_start, authority_end == std::string::npos ? std::string::npos : authority_end - authority_start);
+    if (authority.empty() || authority.find('@') != std::string::npos) return false;
+    std::string host = authority;
+    if (host.front() == '[') {
+      const size_t closing = host.find(']');
+      if (closing == std::string::npos) return false;
+      host = host.substr(1, closing - 1);
+    } else {
+      const size_t port = host.find(':');
+      if (port != std::string::npos) host.resize(port);
+    }
+    if (host.empty()) return false;
+    for (char &character : host) {
+      if (character >= 'A' && character <= 'Z') character += 'a' - 'A';
+    }
+    std::string expected = panel_identity->target_hostname();
+    for (char &character : expected) {
+      if (character >= 'A' && character <= 'Z') character += 'a' - 'A';
+    }
+    if (host == expected || host == expected + ".local") return true;
+    char address[esphome::network::IP_ADDRESS_BUFFER_SIZE];
+    for (const auto &ip : esphome::network::get_ip_addresses()) {
+      std::string known = ip.str_to(address);
+      for (char &character : known) {
+        if (character >= 'A' && character <= 'Z') character += 'a' - 'A';
+      }
+      if (host == known) return true;
+    }
+    return false;
   }
 
   static void send_existing(
@@ -272,7 +325,7 @@ class HaEntityCatalogHandler final
       }
     }
     if (cancel_call_id != 0) {
-      ha_cancel_action_response_callback(cancel_call_id, "entity catalog request timed out");
+      ha_entity_catalog_schedule_cancel(cancel_call_id, "entity catalog request timed out");
     }
     request->send(status, "application/json", body.c_str());
   }
@@ -314,15 +367,21 @@ class HaEntityCatalogHandler final
     {
       std::lock_guard<std::mutex> lock(ha_entity_catalog_mutex());
       for (auto &candidate : ha_entity_catalog_pending()) {
+        if ((candidate.state == HaEntityCatalogPending::State::COMPLETE ||
+             candidate.state == HaEntityCatalogPending::State::ERROR) &&
+            esphome::millis() - candidate.created_ms > HA_ENTITY_CATALOG_RESULT_RETENTION_MS) {
+          candidate.state = HaEntityCatalogPending::State::FREE;
+          candidate.body.clear();
+          candidate.error.clear();
+        }
         if (candidate.state == HaEntityCatalogPending::State::PENDING &&
             esphome::millis() - candidate.created_ms > HA_ENTITY_CATALOG_TIMEOUT_MS) {
           stale_call_id = candidate.call_id;
           candidate.state = HaEntityCatalogPending::State::ERROR;
+          candidate.created_ms = esphome::millis();
           candidate.error = "Home Assistant entity catalog request timed out";
         }
-        if (candidate.state == HaEntityCatalogPending::State::FREE ||
-            candidate.state == HaEntityCatalogPending::State::COMPLETE ||
-            candidate.state == HaEntityCatalogPending::State::ERROR) {
+        if (candidate.state == HaEntityCatalogPending::State::FREE) {
           slot = &candidate;
           break;
         }
@@ -338,7 +397,7 @@ class HaEntityCatalogHandler final
       slot->error.clear();
     }
     if (stale_call_id != 0) {
-      ha_cancel_action_response_callback(stale_call_id, "entity catalog request timed out");
+      ha_entity_catalog_schedule_cancel(stale_call_id, "entity catalog request timed out");
     }
     ha_entity_catalog_schedule_send(
         slot->request_id, query, field, area, device_id, capabilities, include_hidden,

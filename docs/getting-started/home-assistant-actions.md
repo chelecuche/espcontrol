@@ -41,6 +41,19 @@ connection is unavailable, the picker keeps manual entity-ID entry available and
 shows a retry message instead of treating an empty result as success.
 :::
 
+## Install the entity catalogue integration
+
+The web configurator asks Home Assistant for friendly names and areas through the
+`espcontrol.search_entities` response service. Install the [EspControl Home
+Assistant Integration](https://github.com/jtenniswood/espcontrol-integration)
+from HACS, then reload the integration (or restart Home Assistant). Keep **Allow
+the device to perform Home Assistant actions** enabled for the ESPHome device;
+the catalogue request travels over that existing native connection and does not
+require a long-lived token.
+
+If the integration is not installed, the picker still accepts a manually typed
+entity ID, but Home Assistant cannot provide catalogue suggestions.
+
 ## What If I Skip This?
 
 You won't be able to control any devices, it will be in a read-only state, and entities such as lights, switches, fans, scenes, scripts, helpers, covers, locks, media players, and climate devices won't do anything when tapped. Weather cards set to **Temperatures Today** or **Temperatures Tomorrow** also won't be able to fetch the daily forecast.
