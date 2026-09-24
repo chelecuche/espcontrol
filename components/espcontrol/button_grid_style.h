@@ -13,12 +13,10 @@ constexpr uint32_t DEFAULT_TERTIARY_COLOR_RAW = 0x212121;
 // translucent impression without blur or per-frame effects.
 constexpr uint32_t GLASS_CARD_INACTIVE_COLOR_RAW = 0x536273;
 constexpr uint32_t GLASS_CARD_BORDER_COLOR_RAW = 0xFFFFFF;
-constexpr uint32_t GLASS_CARD_SHADOW_COLOR_RAW = 0x000000;
 constexpr uint8_t GLASS_CARD_INACTIVE_OPA = 42;
 constexpr uint8_t GLASS_CARD_ACTIVE_OPA = 178;
 constexpr uint8_t GLASS_CARD_BORDER_OPA = 72;
 constexpr uint8_t GLASS_CARD_ACTIVE_BORDER_OPA = 190;
-constexpr uint8_t GLASS_CARD_SHADOW_OPA = 32;
 constexpr uint32_t GLASS_LIGHT_ACTIVE_RAW = 0xFFC247;
 constexpr uint32_t GLASS_ACCESS_ACTIVE_RAW = 0xEF5350;
 constexpr uint32_t GLASS_CLIMATE_ACTIVE_RAW = 0x42A5F5;

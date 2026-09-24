@@ -10,7 +10,7 @@ These settings control the active colour used across your panel. You'll find the
 
 - **Primary** — the colour cards show when an entity is active. Use the colour picker or type a colour code (for example, `FF8C00` for orange). For the optional glass theme, this remains the fallback active colour for card types without a category accent.
 - **Glass card appearance** — inactive grid tiles use a translucent slate tint with a fine light rim. Active tiles keep the translucent treatment and use category accents: lights are amber, garage doors/locks/covers are red, climate is blue, and media players are green. Gates and other types retain the configured Primary fallback.
-- Category accents preserve the existing state rules: lights highlight when on; garage doors when open or moving; locks when unlocked, unlocking, open/opening, or jammed; covers when open or moving. Unknown/unavailable states are not intentionally treated as active.
+- Category accents preserve the existing state rules: lights highlight when on; garage doors when open or moving; locks when unlocked, unlocking, open/opening, jammed, unknown, or unavailable; covers when open or moving. Indeterminate lock states are intentionally highlighted so they remain visible for follow-up.
 - The glass treatment uses LVGL opacity and a one-pixel border only. It does not use blur, animations, or background sampling, to keep rendering and memory overhead low.
 
 Secondary inactive cards and tertiary information cards use fixed panel colours so setup stays simpler and modal styling remains consistent.
