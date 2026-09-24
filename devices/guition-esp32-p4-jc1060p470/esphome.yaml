@@ -31,6 +31,7 @@ packages:
     file: common/addon/api_encryption_dynamic.yaml
     refresh: 1s
   setup:
-    url: https://github.com/jtenniswood/espcontrol/
+    url: https://github.com/chelecuche/espcontrol/
     file: devices/guition-esp32-p4-jc1060p470/packages.yaml
+    ref: local-glass-cards-1
     refresh: 1s

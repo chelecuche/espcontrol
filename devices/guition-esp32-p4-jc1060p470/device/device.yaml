@@ -7,10 +7,10 @@
 # =============================================================================
 
 substitutions:
-  # Keep this component source on the maintained local glass-cards branch.
-  # The user-facing ESPHome YAML selects this same repository/ref for packages.
+  # Pin the local customization to a tested immutable tag. Update this only
+  # after compiling and validating the corresponding fork release.
   espcontrol_component_url: "https://github.com/chelecuche/espcontrol"
-  espcontrol_component_ref: "glass-cards"
+  espcontrol_component_ref: "local-glass-cards-1"
   mdi_font_file: "https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/fonts/materialdesignicons-webfont.ttf"
 
 # ---------------------------------------------------------------------------
