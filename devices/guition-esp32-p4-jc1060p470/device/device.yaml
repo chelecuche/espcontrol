@@ -7,8 +7,10 @@
 # =============================================================================
 
 substitutions:
-  espcontrol_component_url: "https://github.com/jtenniswood/espcontrol"
-  espcontrol_component_ref: "main"
+  # Keep this component source on the maintained local glass-cards branch.
+  # The user-facing ESPHome YAML selects this same repository/ref for packages.
+  espcontrol_component_url: "https://github.com/chelecuche/espcontrol"
+  espcontrol_component_ref: "glass-cards"
   mdi_font_file: "https://cdn.jsdelivr.net/npm/@mdi/font@7.4.47/fonts/materialdesignicons-webfont.ttf"
 
 # ---------------------------------------------------------------------------

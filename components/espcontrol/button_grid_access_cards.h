@@ -96,7 +96,7 @@ inline bool garage_state_is_active(const std::string &state) {
 }
 
 inline bool cover_toggle_state_is_active(const std::string &state) {
-  return state == "closed" || state == "closing";
+  return state == "open" || state == "opening" || state == "closing";
 }
 
 inline bool garage_state_uses_open_icon(const std::string &state) {
@@ -119,8 +119,8 @@ inline std::string lock_state_label(const std::string &state) {
 
 inline bool lock_state_is_active(const std::string &state) {
   return state == "unlocked" || state == "unlocking" ||
-         state == "open" || state == "opening" ||
-         state == "jammed";
+         state == "open" || state == "opening" || state == "jammed" ||
+         state == "unknown" || state == "unavailable";
 }
 
 inline bool lock_state_uses_unlocked_icon(const std::string &state) {

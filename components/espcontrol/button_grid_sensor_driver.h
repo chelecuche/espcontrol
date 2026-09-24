@@ -27,7 +27,7 @@ inline void sensor_driver_apply_background(
     BtnSlot &slot, const CardPalette &palette) {
   if (!palette.has_sensor_color) return;
   lv_obj_set_style_bg_color(
-    slot.btn, lv_color_hex(palette.sensor_val),
+    slot.btn, lv_color_hex(palette.off_val),
     static_cast<lv_style_selector_t>(LV_PART_MAIN) |
       static_cast<lv_style_selector_t>(LV_STATE_DEFAULT));
 }
@@ -197,7 +197,7 @@ inline bool sensor_driver_bind_data(
     if (!config.sensor.empty()) {
       subscribe_sensor_text_card_value(
         slot.text_lbl, config, slot.btn, sensor_active_color_enabled(config),
-        palette.on_val, palette.sensor_val);
+        palette.on_val, palette.off_val);
     }
     return true;
   }
@@ -220,7 +220,7 @@ inline bool sensor_driver_bind_data(
         slot.sensor_lbl, config.sensor, parse_precision(config.precision),
         slot.unit_lbl, config.unit, slot.btn,
         sensor_active_color_enabled(config), palette.on_val,
-        palette.sensor_val);
+        palette.off_val);
     }
     if (config.label.empty()) subscribe_friendly_name(slot.text_lbl, config.sensor);
   }

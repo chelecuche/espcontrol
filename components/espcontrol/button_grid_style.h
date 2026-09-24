@@ -1,11 +1,43 @@
 #pragma once
 
+#include "display_color.h"
+
 // Shared UI colour tokens for device-side LVGL rendering.
 // Primary is user configurable; secondary and tertiary are fixed defaults.
 
 constexpr uint32_t DEFAULT_PRIMARY_COLOR_RAW = 0xFF8C00;
 constexpr uint32_t DEFAULT_SECONDARY_COLOR_RAW = 0x313131;
 constexpr uint32_t DEFAULT_TERTIARY_COLOR_RAW = 0x212121;
+
+// Lightweight glass card tokens. LVGL opacity and a one-pixel rim create a
+// translucent impression without blur or per-frame effects.
+constexpr uint32_t GLASS_CARD_INACTIVE_COLOR_RAW = 0x536273;
+constexpr uint32_t GLASS_CARD_BORDER_COLOR_RAW = 0xFFFFFF;
+constexpr uint32_t GLASS_CARD_SHADOW_COLOR_RAW = 0x000000;
+constexpr uint8_t GLASS_CARD_INACTIVE_OPA = 42;
+constexpr uint8_t GLASS_CARD_ACTIVE_OPA = 178;
+constexpr uint8_t GLASS_CARD_BORDER_OPA = 72;
+constexpr uint8_t GLASS_CARD_ACTIVE_BORDER_OPA = 190;
+constexpr uint8_t GLASS_CARD_SHADOW_OPA = 32;
+constexpr uint32_t GLASS_LIGHT_ACTIVE_RAW = 0xFFC247;
+constexpr uint32_t GLASS_ACCESS_ACTIVE_RAW = 0xEF5350;
+constexpr uint32_t GLASS_CLIMATE_ACTIVE_RAW = 0x42A5F5;
+constexpr uint32_t GLASS_MEDIA_ACTIVE_RAW = 0x43B581;
+
+inline uint32_t glass_category_active_color(const std::string &type,
+                                            const std::string &entity,
+                                            uint32_t fallback) {
+  if (type == "garage" || type == "lock" || type == "cover")
+    return GLASS_ACCESS_ACTIVE_RAW;
+  if (type == "climate" || type == "climate_control")
+    return GLASS_CLIMATE_ACTIVE_RAW;
+  if (type == "media") return GLASS_MEDIA_ACTIVE_RAW;
+  if (type == "light_brightness" || type == "light_switch" ||
+      type == "light_temperature" || type == "light_control" ||
+      entity.compare(0, 6, "light.") == 0)
+    return GLASS_LIGHT_ACTIVE_RAW;
+  return fallback;
+}
 
 constexpr uint32_t DEFAULT_SLIDER_COLOR = correct_display_color(DEFAULT_PRIMARY_COLOR_RAW);
 constexpr uint32_t DEFAULT_OFF_COLOR = correct_display_color(DEFAULT_SECONDARY_COLOR_RAW);

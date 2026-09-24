@@ -146,6 +146,21 @@ struct CardPalette {
   uint32_t sensor_val = TERTIARY_GREY;
 };
 
+inline CardPalette glass_card_palette(const ParsedCfg &config,
+                                      const CardPalette &base,
+                                      const DisplayProfile &display) {
+  CardPalette palette = base;
+  const uint32_t category_raw = glass_category_active_color(
+    config.type, config.entity, 0);
+  if (category_raw != 0) {
+    palette.has_on = true;
+    palette.on_val = display_correct_color(category_raw, display);
+  }
+  palette.has_off = true;
+  palette.off_val = display_correct_color(GLASS_CARD_INACTIVE_COLOR_RAW, display);
+  return palette;
+}
+
 template<typename T>
 inline T *grid_track_runtime_allocation(lv_obj_t *owner, T *ptr);
 
@@ -539,10 +554,11 @@ inline void subscribe_media_cover_art(MediaNowPlayingCtx *ctx,
 inline void setup_card_visual(BtnSlot &s, const ParsedCfg &p,
                               const espcontrol::cards::Context &context,
                               const GridConfig &cfg,
-                              const CardPalette &palette,
+                              const CardPalette &base_palette,
                               int row_span = 1,
                               int col_span = 1) {
   const DisplayProfile display = display_profile_from_grid_config(cfg);
+  const CardPalette palette = glass_card_palette(p, base_palette, display);
   const auto family = context.family;
   grid_prepare_timer_visual_reset(s.btn);
   espcontrol::cards::status_entity_driver_cleanup(s, p, context);
@@ -565,6 +581,7 @@ inline void setup_card_visual(BtnSlot &s, const ParsedCfg &p,
   reset_card_slot_dynamic_children(s);
   apply_button_colors(s.btn, palette.has_on, palette.on_val,
     palette.has_off, palette.off_val);
+  apply_glass_card_style(s.btn, palette.on_val);
   apply_button_on_pattern(s.btn, p.options, palette.has_on, palette.on_val);
   apply_standard_sensor_number_style(s, display);
   if (s.unit_lbl) lv_obj_clear_flag(s.unit_lbl, LV_OBJ_FLAG_HIDDEN);
@@ -1907,6 +1924,7 @@ inline void grid_phase2(
 
     ParsedCfg p = parse_cfg(scfg);
     const auto context = card_runtime_context(p);
+    const CardPalette card_palette = glass_card_palette(p, palette, display);
     int row_span = order.row_span[idx - 1] > 0 ? order.row_span[idx - 1] : 1;
     int col_span = order.col_span[idx - 1] > 0 ? order.col_span[idx - 1] : 1;
     if (cfg.info_only && info_only_hidden_card_type(context)) continue;
@@ -1916,34 +1934,34 @@ inline void grid_phase2(
     if (espcontrol::cards::wifi_qr_driver_bind_main(s, p, context)) continue;
     auto light_control_environment =
       espcontrol::cards::light_control_driver_environment(
-        palette, display, s);
+        card_palette, display, s);
     if (espcontrol::cards::light_control_driver_bind_main(
           s, p, context, light_control_environment)) continue;
     auto fan_control_environment =
       espcontrol::cards::fan_control_driver_environment(
-        palette, display, s);
+        card_palette, display, s);
     if (espcontrol::cards::fan_control_driver_bind_main(
           s, p, context, fan_control_environment)) continue;
     auto climate_control_environment =
       espcontrol::cards::climate_control_driver_environment(
-        palette, display, s);
+        card_palette, display, s);
     if (espcontrol::cards::climate_control_driver_bind_main(
           s, p, context, climate_control_environment)) continue;
     auto alarm_environment = espcontrol::cards::alarm_driver_environment(
-      palette, display, s, cfg, main_page_obj, NS, COLS);
+      card_palette, display, s, cfg, main_page_obj, NS, COLS);
     if (espcontrol::cards::alarm_driver_bind_main(
           s, p, context, alarm_environment)) continue;
     auto cover_modal_environment =
       espcontrol::cards::cover_modal_driver_environment(
-        palette, display, s);
+        card_palette, display, s);
     if (espcontrol::cards::cover_modal_driver_bind_main(
           s, p, context, cover_modal_environment)) continue;
     auto media_environment = espcontrol::cards::media_driver_environment(
-      palette, display, s, cfg);
+      card_palette, display, s, cfg);
     if (espcontrol::cards::media_driver_bind_main(
           s, p, context, media_environment)) continue;
     if (espcontrol::cards::timer_driver_bind_data(s, p, context)) continue;
-    if (bind_basic_sensor_card(s, p, context, palette, col_span)) continue;
+    if (bind_basic_sensor_card(s, p, context, card_palette, col_span)) continue;
     espcontrol::cards::ToggleDriverState toggle_state;
     toggle_state.has_sensor = &has_sensor[idx - 1];
     toggle_state.sensor_text_mode = &sensor_text_mode[idx - 1];
@@ -1951,10 +1969,10 @@ inline void grid_phase2(
     toggle_state.icon_off = &icon_off_cp[idx - 1];
     toggle_state.icon_on = &icon_on_cp[idx - 1];
     if (espcontrol::cards::basic_action_driver_bind_main(
-          s, p, context, cfg, palette, display, main_page_obj, COLS,
+          s, p, context, cfg, card_palette, display, main_page_obj, COLS,
           toggle_state)) continue;
     if (espcontrol::cards::numeric_selectable_driver_bind_main(
-          s, p, context, palette, display)) continue;
+          s, p, context, card_palette, display)) continue;
     if (espcontrol::cards::cleaning_driver_bind_main(
           s, p, context)) continue;
     if (espcontrol::cards::access_cover_driver_bind_main(
@@ -2058,6 +2076,7 @@ inline void grid_phase2(
     lv_obj_t *back_btn = create_grid_card_button(
       sub_scr, sp_radius, sp_pad, sp_btn_fnt, sp_txt_color);
     apply_button_colors(back_btn, false, DEFAULT_SLIDER_COLOR, true, off_val);
+    apply_glass_card_style(back_btn, DEFAULT_SLIDER_COLOR);
     set_grid_card_cell(
       back_btn, sub_scr,
       sp_ord.back_pos % COLS, sp_ord.back_pos / COLS,
@@ -2117,6 +2136,7 @@ inline void grid_phase2(
       ParsedCfg sb_cfg = parsed_cfg_from_subpage_btn(sb);
       const auto context = card_runtime_context(
           sb_cfg, espcontrol::cards::Surface::SUBPAGE);
+      const CardPalette card_palette = glass_card_palette(sb_cfg, palette, display);
       int col, row;
       if (sp_ord.has_back_token) { col = gp % COLS; row = gp / COLS; }
       else { int op = gp + 1; col = op % COLS; row = op / COLS; }
@@ -2144,25 +2164,25 @@ inline void grid_phase2(
             sub_slot, sb_cfg, context)) continue;
       auto light_control_environment =
         espcontrol::cards::light_control_driver_environment(
-          palette, display, sub_slot);
+          card_palette, display, sub_slot);
       light_control_environment.add_parent_indicator =
         [&](const std::string &entity_id) { add_parent_indicator(entity_id); };
       if (espcontrol::cards::light_control_driver_bind_subpage(
             sub_slot, sb_cfg, context, light_control_environment)) continue;
       auto fan_control_environment =
         espcontrol::cards::fan_control_driver_environment(
-          palette, display, sub_slot);
+          card_palette, display, sub_slot);
       fan_control_environment.add_parent_indicator =
         [&](const std::string &entity_id) { add_parent_indicator(entity_id); };
       if (espcontrol::cards::fan_control_driver_bind_subpage(
             sub_slot, sb_cfg, context, fan_control_environment)) continue;
       auto climate_control_environment =
         espcontrol::cards::climate_control_driver_environment(
-          palette, display, sub_slot);
+          card_palette, display, sub_slot);
       if (espcontrol::cards::climate_control_driver_bind_subpage(
             sub_slot, sb_cfg, context, climate_control_environment)) continue;
       auto alarm_environment = espcontrol::cards::alarm_driver_environment(
-        palette, display, sub_slot, cfg, sub_scr, NS, COLS);
+        card_palette, display, sub_slot, cfg, sub_scr, NS, COLS);
       alarm_environment.parent_config = &p;
       alarm_environment.add_parent_indicator =
         [&](const std::string &entity_id) { add_parent_indicator(entity_id); };
@@ -2170,13 +2190,13 @@ inline void grid_phase2(
             sub_slot, sb_cfg, context, alarm_environment)) continue;
       auto cover_modal_environment =
         espcontrol::cards::cover_modal_driver_environment(
-          palette, display, sub_slot);
+          card_palette, display, sub_slot);
       cover_modal_environment.add_parent_indicator =
         [&](const std::string &entity_id) { add_parent_indicator(entity_id); };
       if (espcontrol::cards::cover_modal_driver_bind_subpage(
             sub_slot, sb_cfg, context, cover_modal_environment)) continue;
       auto media_environment = espcontrol::cards::media_driver_environment(
-        palette, display, sub_slot, cfg);
+        card_palette, display, sub_slot, cfg);
       media_environment.add_parent_indicator =
         [&](const std::string &entity_id) { add_parent_indicator(entity_id); };
       if (espcontrol::cards::media_driver_bind_subpage(
@@ -2185,11 +2205,11 @@ inline void grid_phase2(
             sub_slot, sb_cfg, context, [&](const std::string &entity_id) {
               add_parent_indicator(entity_id, timer_card_state_active_ref);
             })) continue;
-      if (bind_basic_sensor_card(sub_slot, sb_cfg, context, palette, cs)) continue;
+      if (bind_basic_sensor_card(sub_slot, sb_cfg, context, card_palette, cs)) continue;
       espcontrol::cards::BasicActionSubpageEnvironment action_environment;
       action_environment.grid_config = &cfg;
       action_environment.parent_config = &p;
-      action_environment.palette = palette;
+      action_environment.palette = card_palette;
       action_environment.display = display;
       action_environment.grid_page = sub_scr;
       action_environment.grid_cols = COLS;
@@ -2221,7 +2241,7 @@ inline void grid_phase2(
             sub_slot, sb_cfg, context, action_environment)) continue;
       espcontrol::cards::NumericSelectableSubpageEnvironment
         numeric_environment;
-      numeric_environment.palette = palette;
+      numeric_environment.palette = card_palette;
       numeric_environment.display = display;
       numeric_environment.add_parent_indicator =
         [&](const std::string &entity_id) { add_parent_indicator(entity_id); };

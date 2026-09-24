@@ -73,7 +73,7 @@ inline bool status_entity_driver_setup_visual(
 
   if (palette.has_sensor_color) {
     lv_obj_set_style_bg_color(
-      slot.btn, lv_color_hex(palette.sensor_val),
+      slot.btn, lv_color_hex(palette.off_val),
       static_cast<lv_style_selector_t>(LV_PART_MAIN) |
         static_cast<lv_style_selector_t>(LV_STATE_DEFAULT));
   }
@@ -127,14 +127,14 @@ inline bool status_entity_driver_bind_data(
     std::function<void(esphome::StringRef)>(
       [btn = slot.btn, icon = slot.icon_lbl, type, inactive_icon, active_icon,
        active_color, on_color = palette.on_val,
-       sensor_color = palette.sensor_val](esphome::StringRef state) {
+       off_color = palette.off_val](esphome::StringRef state) {
         const bool unavailable = ha_state_unavailable_ref(state);
         const bool active = !unavailable &&
           status_entity_driver_state_active(type, state);
         lv_label_set_display_text(icon, active ? active_icon : inactive_icon);
         if (btn && active_color) {
           lv_obj_set_style_bg_color(
-            btn, lv_color_hex(active ? on_color : sensor_color),
+            btn, lv_color_hex(active ? on_color : off_color),
             static_cast<lv_style_selector_t>(LV_PART_MAIN) |
               static_cast<lv_style_selector_t>(LV_STATE_DEFAULT));
         }

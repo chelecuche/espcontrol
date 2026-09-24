@@ -373,6 +373,23 @@ inline void apply_button_colors(lv_obj_t *btn, bool has_on, uint32_t on_val,
   }
 }
 
+inline void apply_glass_card_style(lv_obj_t *btn, uint32_t active_color) {
+  if (!btn) return;
+  const lv_style_selector_t main = static_cast<lv_style_selector_t>(LV_PART_MAIN);
+  const lv_style_selector_t checked = main | static_cast<lv_style_selector_t>(LV_STATE_CHECKED);
+  const lv_style_selector_t pressed = main | static_cast<lv_style_selector_t>(LV_STATE_PRESSED);
+  lv_obj_set_style_bg_opa(btn, GLASS_CARD_INACTIVE_OPA, main);
+  lv_obj_set_style_bg_opa(btn, GLASS_CARD_ACTIVE_OPA, checked);
+  lv_obj_set_style_bg_opa(btn, GLASS_CARD_ACTIVE_OPA, pressed);
+  lv_obj_set_style_border_width(btn, 1, main);
+  lv_obj_set_style_border_color(btn, lv_color_hex(GLASS_CARD_BORDER_COLOR_RAW), main);
+  lv_obj_set_style_border_opa(btn, GLASS_CARD_BORDER_OPA, main);
+  lv_obj_set_style_border_color(btn, lv_color_hex(active_color), checked);
+  lv_obj_set_style_border_color(btn, lv_color_hex(active_color), pressed);
+  lv_obj_set_style_border_opa(btn, GLASS_CARD_ACTIVE_BORDER_OPA, checked);
+  lv_obj_set_style_border_opa(btn, GLASS_CARD_ACTIVE_BORDER_OPA, pressed);
+}
+
 inline uint32_t card_pattern_highlight_color(uint32_t color) {
   uint8_t r = (color >> 16) & 0xFF;
   uint8_t g = (color >> 8) & 0xFF;

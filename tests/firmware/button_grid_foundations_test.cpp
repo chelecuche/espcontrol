@@ -3,11 +3,24 @@
 
 #include "button_grid_limits.h"
 #include "button_grid_card_runtime.h"
+#include "button_grid_style.h"
 #include "button_grid_string.h"
 
 int main() {
   static_assert(MAX_GRID_SLOTS == ESPCONTROL_MAX_GRID_SLOTS);
   static_assert(MAX_SUBPAGE_ITEMS == MAX_GRID_SLOTS * MAX_GRID_SLOTS);
+
+  if (glass_category_active_color("light_switch", "", 0) != GLASS_LIGHT_ACTIVE_RAW ||
+      glass_category_active_color("", "light.kitchen", 0) != GLASS_LIGHT_ACTIVE_RAW ||
+      glass_category_active_color("garage", "cover.garage", 0) != GLASS_ACCESS_ACTIVE_RAW ||
+      glass_category_active_color("lock", "lock.front_door", 0) != GLASS_ACCESS_ACTIVE_RAW ||
+      glass_category_active_color("cover", "cover.blinds", 0) != GLASS_ACCESS_ACTIVE_RAW ||
+      glass_category_active_color("climate", "climate.home", 0) != GLASS_CLIMATE_ACTIVE_RAW ||
+      glass_category_active_color("media", "media_player.tv", 0) != GLASS_MEDIA_ACTIVE_RAW ||
+      glass_category_active_color("gate", "cover.gate", 0) != 0 ||
+      glass_category_active_color("switch", "switch.fan", 0x112233) != 0x112233) {
+    return EXIT_FAILURE;
+  }
 
   const auto &registry_service = espcontrol::cards::card_runtime_registry_service();
   const auto service_media = registry_service.context_for("media", "");
